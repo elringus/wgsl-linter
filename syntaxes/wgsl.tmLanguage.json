@@ -1,0 +1,137 @@
+{
+    "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+    "name": "WGSL",
+    "scopeName": "source.wgsl",
+    "patterns": [{ "include": "#code" }],
+    "repository": {
+        "code": {
+            "patterns": [
+                { "include": "#comments" },
+                { "include": "#attributes" },
+                { "include": "#declarations" },
+                { "include": "#keywords" },
+                { "include": "#types" },
+                { "include": "#calls" },
+                { "include": "#numbers" },
+                { "include": "#operators" },
+                { "include": "#punctuation" },
+                { "include": "#identifiers" }
+            ]
+        },
+        "comments": {
+            "patterns": [
+                {
+                    "name": "comment.line.double-slash.wgsl",
+                    "begin": "//",
+                    "end": "$"
+                },
+                { "include": "#block-comment" }
+            ]
+        },
+        "block-comment": {
+            "name": "comment.block.wgsl",
+            "begin": "/\\*",
+            "end": "\\*/",
+            "patterns": [{ "include": "#block-comment" }]
+        },
+        "attributes": {
+            "match": "(@)\\s*([_\\p{L}][\\w]*)",
+            "captures": {
+                "1": { "name": "punctuation.definition.attribute.wgsl" },
+                "2": { "name": "entity.name.function.attribute.wgsl" }
+            }
+        },
+        "declarations": {
+            "patterns": [
+                {
+                    "match": "\\b(fn)\\s+([_\\p{L}][\\w]*)",
+                    "captures": {
+                        "1": { "name": "storage.type.function.wgsl" },
+                        "2": { "name": "entity.name.function.wgsl" }
+                    }
+                },
+                {
+                    "match": "\\b(struct)\\s+([_\\p{L}][\\w]*)",
+                    "captures": {
+                        "1": { "name": "storage.type.struct.wgsl" },
+                        "2": { "name": "entity.name.type.struct.wgsl" }
+                    }
+                },
+                {
+                    "match": "\\b(alias)\\s+([_\\p{L}][\\w]*)",
+                    "captures": {
+                        "1": { "name": "storage.type.alias.wgsl" },
+                        "2": { "name": "entity.name.type.alias.wgsl" }
+                    }
+                }
+            ]
+        },
+        "keywords": {
+            "patterns": [
+                {
+                    "name": "keyword.control.wgsl",
+                    "match": "\\b(break|case|continue|continuing|default|discard|else|for|if|loop|return|switch|while)\\b"
+                },
+                {
+                    "name": "storage.type.wgsl",
+                    "match": "\\b(alias|const|const_assert|fn|let|override|struct|var)\\b"
+                },
+                {
+                    "name": "keyword.other.directive.wgsl",
+                    "match": "\\b(enable|requires|diagnostic)\\b"
+                },
+                {
+                    "name": "constant.language.boolean.wgsl",
+                    "match": "\\b(true|false)\\b"
+                },
+                {
+                    "name": "storage.modifier.wgsl",
+                    "match": "\\b(function|private|workgroup|uniform|storage|immediate|read|write|read_write)\\b"
+                }
+            ]
+        },
+        "types": {
+            "patterns": [
+                {
+                    "name": "storage.type.builtin.wgsl",
+                    "match": "\\b(bool|i32|u32|f32|f16|vec[234][iufh]?|mat[234]x[234][fh]?|array|atomic|ptr|buffer|sampler|sampler_comparison|texture_(?:1d|2d|2d_array|3d|cube|cube_array|multisampled_2d|external|storage_(?:1d|2d|2d_array|3d)|depth_(?:2d|2d_array|cube|cube_array|multisampled_2d)))\\b"
+                },
+                {
+                    "name": "entity.name.type.wgsl",
+                    "match": "\\b\\p{Lu}[\\w]*(?=\\s*(?:\\(|<|>|,|\\)|;|\\{|=|\\]))"
+                }
+            ]
+        },
+        "calls": {
+            "match": "\\b([_\\p{L}][\\w]*)(?=\\s*\\()",
+            "captures": { "1": { "name": "entity.name.function.call.wgsl" } }
+        },
+        "numbers": {
+            "patterns": [
+                {
+                    "name": "constant.numeric.hex.wgsl",
+                    "match": "\\b0[xX](?:[0-9a-fA-F]*\\.?[0-9a-fA-F]*(?:[pP][+-]?[0-9]+)?)[iufh]?\\b"
+                },
+                {
+                    "name": "constant.numeric.decimal.wgsl",
+                    "match": "(?:\\b[0-9]+\\.?[0-9]*|\\.[0-9]+)(?:[eE][+-]?[0-9]+)?[iufh]?\\b"
+                }
+            ]
+        },
+        "operators": {
+            "name": "keyword.operator.wgsl",
+            "match": "->|&&|\\|\\||<<=?|>>=?|[=!<>]=|[-+*/%&|^]=|\\+\\+|--|[-+*/%&|^~!=<>]"
+        },
+        "punctuation": {
+            "patterns": [
+                { "name": "punctuation.separator.wgsl", "match": "[,;:]" },
+                { "name": "punctuation.accessor.wgsl", "match": "\\." },
+                { "name": "punctuation.brackets.wgsl", "match": "[(){}\\[\\]]" }
+            ]
+        },
+        "identifiers": {
+            "name": "variable.other.wgsl",
+            "match": "\\b[_\\p{L}][\\w]*\\b"
+        }
+    }
+}

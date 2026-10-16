@@ -9,5 +9,6 @@
         "strict": true,
         "skipLibCheck": true
     },
-    "include": ["src", "spec", "scripts", "cts", "vite.config.ts"]
+    "include": ["src", "spec", "scripts", "cts", "vite.config.ts"],
+    "exclude": ["cts/suite"]
 }

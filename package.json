@@ -11,6 +11,7 @@
     "files": [
         "dist/*.js",
         "dist/*.d.ts",
+        "syntaxes/*.json",
         "language-configuration.json",
         "LICENSE.md"
     ],
@@ -23,6 +24,7 @@
     "scripts": {
         "lint": "vp check --fix",
         "test": "vp test",
+        "cts": "bun scripts/cts.ts",
         "build": "vp pack",
         "vsce": "bun run build && vsce package --no-dependencies --allow-missing-repository --out dist",
         "update": "bun update -i -r --latest"
@@ -31,7 +33,8 @@
         "@types/bun": "1.4.3",
         "@types/vscode": "1.140.0",
         "@vscode/vsce": "4.0.0",
-        "vite-plus": "1.3.0"
+        "vite-plus": "1.3.0",
+        "webgpu": "0.6.2"
     },
     "contributes": {
         "languages": [
@@ -45,8 +48,35 @@
                 ],
                 "configuration": "./language-configuration.json"
             }
+        ],
+        "grammars": [
+            {
+                "language": "wgsl",
+                "scopeName": "source.wgsl",
+                "path": "./syntaxes/wgsl.tmLanguage.json"
+            },
+            {
+                "scopeName": "inline.wgsl",
+                "path": "./syntaxes/wgsl.injection.json",
+                "injectTo": [
+                    "source.js",
+                    "source.jsx",
+                    "source.js.jsx",
+                    "source.ts",
+                    "source.tsx"
+                ],
+                "embeddedLanguages": {
+                    "meta.embedded.block.wgsl": "wgsl"
+                }
+            }
         ]
     },
+    "activationEvents": [
+        "onLanguage:javascript",
+        "onLanguage:javascriptreact",
+        "onLanguage:typescript",
+        "onLanguage:typescriptreact"
+    ],
     "engines": {
         "vscode": "^1.140.0"
     }
