@@ -1,0 +1,53 @@
+{
+    "name": "wgsl-linter",
+    "displayName": "WGSL Linter",
+    "version": "0.0.1",
+    "description": "WGSL language support: semantic highlighting, diagnostics, completion, hover, navigation, rename and formatting.",
+    "license": "MIT",
+    "publisher": "elringus",
+    "bin": {
+        "wgsl-lint": "./dist/cli.js"
+    },
+    "files": [
+        "dist/*.js",
+        "dist/*.d.ts",
+        "language-configuration.json",
+        "LICENSE.md"
+    ],
+    "type": "module",
+    "main": "./dist/vscode.js",
+    "exports": {
+        ".": "./dist/index.js",
+        "./vscode": "./dist/vscode.js"
+    },
+    "scripts": {
+        "lint": "vp check --fix",
+        "test": "vp test",
+        "build": "vp pack",
+        "vsce": "bun run build && vsce package --no-dependencies --allow-missing-repository --out dist",
+        "update": "bun update -i -r --latest"
+    },
+    "devDependencies": {
+        "@types/bun": "1.4.3",
+        "@types/vscode": "1.140.0",
+        "@vscode/vsce": "4.0.0",
+        "vite-plus": "1.3.0"
+    },
+    "contributes": {
+        "languages": [
+            {
+                "id": "wgsl",
+                "aliases": [
+                    "WGSL"
+                ],
+                "extensions": [
+                    ".wgsl"
+                ],
+                "configuration": "./language-configuration.json"
+            }
+        ]
+    },
+    "engines": {
+        "vscode": "^1.140.0"
+    }
+}

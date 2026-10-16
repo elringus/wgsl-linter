@@ -1,0 +1,10 @@
+.DS_Store
+
+.vs
+.zed
+.idea
+
+node_modules
+coverage
+dist
+*.lock
