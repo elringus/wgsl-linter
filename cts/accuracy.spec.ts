@@ -58,9 +58,9 @@ const enabled = !!process.env.CTS && existsSync(expression);
 
 describe.skipIf(!enabled)("const-evaluation accuracy", async () => {
     const runs = enabled ? await captureRuns() : [];
-    const { toComparator } = await import(`${expression}/expectation.ts`);
 
-    it.each(runs.map(run => [run.test, run] as const))("evaluates %s", (_, run) => {
+    it.each(runs.map(run => [run.test, run] as const))("evaluates %s", async (_, run) => {
+        const { toComparator } = await import(`${expression}/expectation.ts`);
         const failures = evaluate(run, toComparator);
         expect(failures.slice(0, 10)).toEqual([]);
     });

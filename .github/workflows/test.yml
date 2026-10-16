@@ -1,0 +1,24 @@
+name: test
+
+on:
+    push:
+        branches: [main]
+    pull_request:
+        branches: [main]
+
+permissions:
+    contents: read
+
+jobs:
+    test:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v6
+            - uses: oven-sh/setup-bun@v2
+            - uses: actions/setup-node@v6
+              with:
+                  node-version: 26
+            - run: bun install
+            - run: bunx vp check
+            - run: bun run test
+            - run: bun run build

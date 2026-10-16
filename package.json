@@ -16,7 +16,6 @@
         "dist/*.js",
         "dist/*.d.ts",
         "syntaxes/*.json",
-        "language-configuration.json",
         "assets/logo.png",
         "assets/file-*.svg",
         "LICENSE.md"
@@ -52,7 +51,7 @@
                 "extensions": [
                     ".wgsl"
                 ],
-                "configuration": "./language-configuration.json",
+                "configuration": "./syntaxes/language-configuration.json",
                 "icon": {
                     "light": "./assets/file-light.svg",
                     "dark": "./assets/file-dark.svg"

@@ -58,7 +58,7 @@ export function activate(context: vscode.ExtensionContext) {
 - `prelude`: WGSL declarations available to all the shaders, such as engine-provided structs.
 - `extensions`, `features`: the enable-extensions and language features the target supports; Chrome's by default.
 
-For highlighting, contribute the `wgsl` language and the grammars in `syntaxes`, as this repository's `package.json` does.
+For highlighting, contribute the `wgsl` language with the configuration and grammars in `syntaxes`, as this repository's `package.json` does.
 
 ## Development
 
