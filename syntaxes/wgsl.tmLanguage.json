@@ -13,6 +13,7 @@
                 { "include": "#types" },
                 { "include": "#calls" },
                 { "include": "#numbers" },
+                { "include": "#templates" },
                 { "include": "#operators" },
                 { "include": "#punctuation" },
                 { "include": "#identifiers" }
@@ -38,8 +39,15 @@
             "match": "(@)\\s*([_\\p{L}][\\w]*)",
             "captures": {
                 "1": { "name": "punctuation.definition.attribute.wgsl" },
-                "2": { "name": "entity.name.function.attribute.wgsl" }
+                "2": { "name": "entity.other.attribute.wgsl" }
             }
+        },
+        "templates": {
+            "begin": "(?<=\\w)(<)(?![<=])",
+            "beginCaptures": { "1": { "name": "punctuation.brackets.angle.wgsl" } },
+            "end": "(>)|(?=[;{}])",
+            "endCaptures": { "1": { "name": "punctuation.brackets.angle.wgsl" } },
+            "patterns": [{ "include": "#code" }]
         },
         "declarations": {
             "patterns": [
