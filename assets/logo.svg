@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" role="img" aria-labelledby="title">
+  <title id="title">WGSL Linter</title>
+  <defs>
+    <path id="tile" d="M91.39 0H164.61C241.83 0 256 14.17 256 91.39V164.61C256 241.83 241.83 256 164.61 256H91.39C14.17 256 0 241.83 0 164.61V91.39C0 14.17 14.17 0 91.39 0Z"/>
+    <clipPath id="clip"><use href="#tile"/></clipPath>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1c2541"/>
+      <stop offset="1" stop-color="#0b1020"/>
+    </linearGradient>
+    <radialGradient id="glow" gradientUnits="userSpaceOnUse" cx="168" cy="96" r="150">
+      <stop offset="0" stop-color="#38bdf8" stop-opacity=".22"/>
+      <stop offset="1" stop-color="#38bdf8" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="mark" gradientUnits="userSpaceOnUse" x1="32" y1="204.69" x2="224" y2="45.31">
+      <stop offset="0" stop-color="#3b82f6"/>
+      <stop offset=".5" stop-color="#22d3ee"/>
+      <stop offset="1" stop-color="#34d399"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="6" stdDeviation="8" flood-color="#000" flood-opacity=".35"/>
+    </filter>
+  </defs>
+  <use href="#tile" fill="url(#bg)"/>
+  <g clip-path="url(#clip)">
+    <rect width="256" height="256" fill="url(#glow)"/>
+    <use href="#tile" fill="none" stroke="#fff" stroke-opacity=".07" stroke-width="3"/>
+  </g>
+  <path d="M35.51 92.85A5 5 0 0 1 40 85.66L60.3 85.66A5 5 0 0 1 64.79 88.47L90.05 140.26L113.67 91.85A5 5 0 0 1 122.65 91.85L146.27 140.26L191.21 48.12A5 5 0 0 1 195.7 45.31L216 45.31A5 5 0 0 1 220.49 52.5L150.76 195.48A5 5 0 0 1 141.77 195.48L118.16 147.06L94.55 195.48A5 5 0 0 1 85.56 195.48Z" fill="url(#mark)" filter="url(#shadow)"/>
+</svg>

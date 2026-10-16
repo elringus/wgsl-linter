@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32" role="img" aria-labelledby="title">
+  <title id="title">WGSL shader</title>
+  <g fill="#a074c4">
+    <path d="M16 4.44L25.11 9.7L16 14.96L6.89 9.7Z"/>
+    <path opacity=".8" d="M5.99 11.26L15.1 16.52L15.1 27.04L5.99 21.78Z"/>
+    <path opacity=".6" d="M16.9 16.52L26.01 11.26L26.01 21.78L16.9 27.04Z"/>
+  </g>
+</svg>

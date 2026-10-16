@@ -4,6 +4,10 @@
     "version": "0.0.1",
     "description": "WGSL language support: semantic highlighting, diagnostics, completion, hover, navigation, rename and formatting.",
     "license": "MIT",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/elringus/wgsl-linter"
+    },
     "publisher": "elringus",
     "bin": {
         "wgsl-lint": "./dist/cli.js"
@@ -13,6 +17,8 @@
         "dist/*.d.ts",
         "syntaxes/*.json",
         "language-configuration.json",
+        "assets/logo.png",
+        "assets/file-*.svg",
         "LICENSE.md"
     ],
     "type": "module",
@@ -26,7 +32,7 @@
         "test": "vp test",
         "cts": "bun scripts/cts.ts",
         "build": "vp pack",
-        "vsce": "bun run build && vsce package --no-dependencies --allow-missing-repository --out dist",
+        "vsce": "bun run build && vsce package --no-dependencies --out dist",
         "update": "bun update -i -r --latest"
     },
     "devDependencies": {
@@ -46,7 +52,11 @@
                 "extensions": [
                     ".wgsl"
                 ],
-                "configuration": "./language-configuration.json"
+                "configuration": "./language-configuration.json",
+                "icon": {
+                    "light": "./assets/file-light.svg",
+                    "dark": "./assets/file-dark.svg"
+                }
             }
         ],
         "grammars": [
@@ -77,6 +87,7 @@
         "onLanguage:typescript",
         "onLanguage:typescriptreact"
     ],
+    "icon": "assets/logo.png",
     "engines": {
         "vscode": "^1.140.0"
     }

@@ -1,3 +1,5 @@
+<p align="center"><img src="assets/logo-mark.png" width="128" alt="WGSL Linter"></p>
+
 # WGSL Linter
 
 Full WGSL language support: semantic highlighting, diagnostics, completion, hover, navigation, rename and formatting — both in `.wgsl` files and in WGSL templates embedded in JS/TS sources.

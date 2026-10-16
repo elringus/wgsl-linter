@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="204" height="171.38" viewBox="26 39.31 204 171.38" role="img" aria-labelledby="title">
+  <title id="title">WGSL Linter</title>
+  <defs>
+    <linearGradient id="mark" gradientUnits="userSpaceOnUse" x1="32" y1="204.69" x2="224" y2="45.31">
+      <stop offset="0" stop-color="#3b82f6"/>
+      <stop offset=".5" stop-color="#22d3ee"/>
+      <stop offset="1" stop-color="#34d399"/>
+    </linearGradient>
+  </defs>
+  <path d="M35.51 92.85A5 5 0 0 1 40 85.66L60.3 85.66A5 5 0 0 1 64.79 88.47L90.05 140.26L113.67 91.85A5 5 0 0 1 122.65 91.85L146.27 140.26L191.21 48.12A5 5 0 0 1 195.7 45.31L216 45.31A5 5 0 0 1 220.49 52.5L150.76 195.48A5 5 0 0 1 141.77 195.48L118.16 147.06L94.55 195.48A5 5 0 0 1 85.56 195.48Z" fill="url(#mark)"/>
+</svg>
