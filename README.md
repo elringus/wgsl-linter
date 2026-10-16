@@ -1,4 +1,12 @@
 <p align="center"><img src="assets/logo-mark.png" width="128" alt="WGSL Linter"></p>
+<br/>
+<p align="center">
+  <a href="https://marketplace.visualstudio.com/items?itemName=Elringus.wgsl-linter"><img src="https://vsmarketplacebadges.dev/version/Elringus.wgsl-linter.svg?label=vscode" alt="vscode"></a>
+  <a href="https://www.npmjs.com/package/wgsl-linter"><img src="https://img.shields.io/npm/v/wgsl-linter" alt="npm"></a>
+  <a href="https://codefactor.io/repository/github/elringus/wgsl-linter/overview/main"><img src="https://codefactor.io/repository/github/elringus/wgsl-linter/badge/main" alt="codefactor"></a>
+  <a href="https://github.com/elringus/wgsl-linter/actions/workflows/codeql.yml"><img src="https://github.com/elringus/wgsl-linter/actions/workflows/codeql.yml/badge.svg" alt="codeql"></a>
+</p>
+<br/>
 
 # WGSL Linter
 
