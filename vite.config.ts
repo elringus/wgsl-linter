@@ -5,7 +5,7 @@ const entries = { index: "src/index.ts", vscode: "src/vscode/index.ts", cli: "sr
 export default defineConfig({
     pack: Object.entries(entries).map(([name, source]) => ({
         entry: { [name]: source },
-        dts: name === "vscode" && { generator: "oxc" },
+        dts: name !== "cli" && { generator: "oxc" },
         clean: false,
         fixedExtension: false,
         deps: { neverBundle: ["vscode"] },

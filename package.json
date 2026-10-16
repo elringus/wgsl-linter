@@ -3,14 +3,26 @@
     "displayName": "WGSL Linter",
     "version": "0.0.1",
     "description": "WGSL language support: semantic highlighting, diagnostics, completion, hover, navigation, rename and formatting.",
+    "keywords": [
+        "cli",
+        "formatter",
+        "intellisense",
+        "linter",
+        "shaders",
+        "static-analysis",
+        "syntax-highlighting",
+        "vscode-extension",
+        "webgpu",
+        "wgsl"
+    ],
     "license": "MIT",
     "repository": {
         "type": "git",
-        "url": "https://github.com/elringus/wgsl-linter"
+        "url": "git+https://github.com/elringus/wgsl-linter.git"
     },
     "publisher": "elringus",
     "bin": {
-        "wgsl-lint": "./dist/cli.js"
+        "wgsl-lint": "dist/cli.js"
     },
     "files": [
         "dist/*.js",
