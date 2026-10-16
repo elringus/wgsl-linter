@@ -12,6 +12,7 @@ export { check } from "./semantic/check.ts";
 export { validatePipeline, type PipelineStage } from "./semantic/pipeline.ts";
 export { Document, type DocumentOptions } from "./service/document.ts";
 export { hover, type Hover } from "./service/hover.ts";
+export type { Layout } from "./service/describe.ts";
 export { inlayHints, type InlayHint } from "./service/hints.ts";
 export {
     completion,

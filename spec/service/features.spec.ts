@@ -46,28 +46,43 @@ describe("hover", () => {
         expect(hover(doc, at("light.color", 2))?.code).toBe("var<uniform> light: Light");
     });
 
-    it("shows the structures with their layout and the preceding comments", () => {
-        const result = hover(doc, at("Light {", 1));
+    it("shows the structures in buffers with their layout and the preceding comments", () => {
+        expect(hover(doc, at("Light {", 1))).toEqual({
+            start: at("Light {"),
+            end: at("Light {", 5),
+            code: "struct Light {\n    color: vec3<f32>,\n    intensity: f32,\n}",
+            layout: { size: 16, align: 16 },
+            documentation: "Light parameters.",
+        });
+    });
+
+    it("shows the layout only for the types in buffers", () => {
+        const code = "struct Out { @builtin(position) p: vec4f, @location(0) c: vec4f }";
+        const result = hover(new Document(code), code.indexOf("Out"));
         expect(result?.code).toBe(
-            "// size 16, align 16\nstruct Light {\n    color: vec3<f32>, // offset 0, size 12, align 16\n    intensity: f32, // offset 12, size 4, align 4\n}",
+            "struct Out {\n    @builtin(position) p: vec4<f32>,\n    @location(0) c: vec4<f32>,\n}",
         );
-        expect(result?.documentation).toBe("Light parameters.");
+        expect(result?.layout).toBeUndefined();
+    });
+
+    it("shows the layout of the buffer variables", () => {
+        expect(hover(doc, at("light: ", 1))?.layout).toEqual({ size: 16, align: 16 });
     });
 
     it("shows the struct members with their layout", () => {
-        expect(hover(doc, at("color *", 1))?.code).toBe(
-            "Light.color: vec3<f32> // offset 0, size 12, align 16",
-        );
+        const result = hover(doc, at("color *", 1));
+        expect(result?.code).toBe("Light.color: vec3<f32>");
+        expect(result?.layout).toEqual({ offset: 0, size: 12, align: 16 });
     });
 
     it("shows the builtin overload selected for the call", () => {
         expect(hover(doc, at("max(", 1))?.code).toBe("fn max(f32, f32) -> f32");
     });
 
-    it("shows the predeclared type aliases", () => {
-        expect(hover(doc, at("vec3f(0", 1))?.code).toBe(
-            "alias vec3f = vec3<f32> // size 12, align 16",
-        );
+    it("shows the predeclared type aliases with their layout", () => {
+        const result = hover(doc, at("vec3f(0", 1));
+        expect(result?.code).toBe("alias vec3f = vec3<f32>");
+        expect(result?.layout).toEqual({ size: 12, align: 16 });
     });
 
     it("shows the constants with their values", () => {

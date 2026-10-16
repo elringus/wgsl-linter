@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import { type Template, extractTemplates } from "../embed.ts";
 import type { Options as AnalyzerOptions } from "../semantic/check.ts";
 import { completion, CompletionKind } from "../service/completion.ts";
+import type { Layout } from "../service/describe.ts";
 import { Document } from "../service/document.ts";
 import { format } from "../service/format.ts";
 import { inlayHints } from "../service/hints.ts";
@@ -256,7 +257,10 @@ class Features {
         const result = at && hover(at[0].doc, at[1]);
         if (!result) return undefined;
         const contents = new vscode.MarkdownString().appendCodeblock(result.code, "wgsl");
-        if (result.documentation) contents.appendMarkdown(`\n\n${result.documentation}`);
+        const sections: string[] = [];
+        if (result.documentation) sections.push(result.documentation);
+        if (result.layout) sections.push(layoutLine(result.layout));
+        if (sections.length > 0) contents.appendMarkdown(`\n\n---\n\n${sections.join("\n\n")}`);
         return new vscode.Hover(contents, this.range(document, at[0], result));
     }
 
@@ -453,6 +457,12 @@ class Features {
         action.edit.replace(document.uri, target, formatted);
         return [action];
     }
+}
+
+/** Formats the memory layout of a type, struct member or buffer variable as a Markdown line. */
+function layoutLine({ offset, size, align }: Layout): string {
+    const where = offset === undefined ? "" : `**Offset** ${offset} · `;
+    return `${where}**Size** ${size} · **Align** ${align}`;
 }
 
 /** Formats the template's content, indenting the lines one level deeper than the template's line. */

@@ -207,6 +207,24 @@ describe("vscode adapter", () => {
         expect(call("hover", "provideHover", script, new vscode.Position(0, 7))).toBeUndefined();
     });
 
+    it("shows the layout of the types in buffers under the code", () => {
+        const doc = document(
+            "struct L { c: vec3f }\n@group(0) @binding(0) var<uniform> u: L;\n",
+            "wgsl",
+            "file:///uniform",
+        );
+        const hover = call("hover", "provideHover", doc, new vscode.Position(0, 7)) as {
+            contents: { value: string };
+        };
+        expect(hover.contents.value).toBe(
+            "```wgsl\nstruct L {\n    c: vec3<f32>,\n}\n```\n\n---\n\n**Size** 16 · **Align** 16",
+        );
+        const member = call("hover", "provideHover", doc, new vscode.Position(0, 11)) as {
+            contents: { value: string };
+        };
+        expect(member.contents.value).toContain("**Offset** 0 · **Size** 12 · **Align** 16");
+    });
+
     it("maps the definitions back to the host document", () => {
         const location = call(
             "definition",
