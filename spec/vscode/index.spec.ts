@@ -225,6 +225,19 @@ describe("vscode adapter", () => {
         expect(member.contents.value).toContain("**Offset** 0 · **Size** 12 · **Align** 16");
     });
 
+    it("shows the descriptions of the predeclared names with links to the specification", () => {
+        const doc = document("@vertex fn main() {}\n", "wgsl", "file:///vertex");
+        const hover = call("hover", "provideHover", doc, new vscode.Position(0, 2)) as {
+            contents: { value: string };
+        };
+        expect(hover.contents.value).toBe(
+            "```wgsl\n@vertex\n```\n\n---\n\n" +
+                "The `vertex` attribute declares the function to be an entry point for the vertex " +
+                "shader stage of a render pipeline.\n\n" +
+                "[Specification](https://www.w3.org/TR/WGSL/#vertex-attr)",
+        );
+    });
+
     it("maps the definitions back to the host document", () => {
         const location = call(
             "definition",

@@ -260,6 +260,7 @@ class Features {
         const sections: string[] = [];
         if (result.documentation) sections.push(result.documentation);
         if (result.layout) sections.push(layoutLine(result.layout));
+        if (result.link) sections.push(`[Specification](${result.link})`);
         if (sections.length > 0) contents.appendMarkdown(`\n\n---\n\n${sections.join("\n\n")}`);
         return new vscode.Hover(contents, this.range(document, at[0], result));
     }

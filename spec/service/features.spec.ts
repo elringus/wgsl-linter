@@ -92,6 +92,94 @@ describe("hover", () => {
     it("works with the cursor right after the name", () => {
         expect(hover(doc, at("light.color", 5))?.code).toBe("var<uniform> light: Light");
     });
+
+    it("describes the builtin functions with links to the specification", () => {
+        expect(hover(doc, at("dot(", 1))).toEqual({
+            start: at("dot("),
+            end: at("dot(", 3),
+            code: "fn dot(vec3<f32>, vec3<f32>) -> f32",
+            documentation: "Returns the dot product of `e1` and `e2`.",
+            link: "https://www.w3.org/TR/WGSL/#dot-builtin",
+        });
+    });
+
+    it("describes the builtin function overloads described differently by their parameters", () => {
+        const code = `var<workgroup> a: atomic<u32>;
+var<workgroup> v: u32;
+fn f(b: vec2<bool>) {
+    _ = extractBits(1u, 0, 1);
+    _ = extractBits(vec2i(1), 0, 1);
+    _ = select(vec2i(1), vec2i(2), b);
+    _ = mix(vec2f(), vec2f(), 0.5);
+    _ = workgroupUniformLoad(&a);
+    _ = workgroupUniformLoad(&v);
+}`;
+        const describe = (call: string): string | undefined =>
+            hover(new Document(code), code.indexOf(call) + 1)?.documentation;
+        expect(describe("extractBits(1u")).toBe(
+            "Reads bits from an integer, without sign extension.",
+        );
+        expect(hover(new Document(code), code.indexOf("extractBits(1u") + 1)?.link).toBe(
+            "https://www.w3.org/TR/WGSL/#extractBits-unsigned-builtin",
+        );
+        expect(describe("extractBits(vec2i")).toBe(
+            "Reads bits from an integer, with sign extension.",
+        );
+        expect(describe("select")).toMatch(/^Component-wise selection\./);
+        expect(describe("mix")).toMatch(/using scalar blending factor/);
+        expect(describe("workgroupUniformLoad(&a")).toMatch(/^Atomically loads/);
+        expect(describe("workgroupUniformLoad(&v")).toMatch(/^Returns the value pointed to/);
+    });
+
+    it("describes the predeclared types and type generators", () => {
+        expect(hover(doc, at("f32,", 1))?.link).toBe("https://www.w3.org/TR/WGSL/#f32");
+        expect(hover(doc, at("vec3f(0", 1))?.documentation).toBe(
+            "A vector is a grouped sequence of 2, 3, or 4 scalar components.",
+        );
+        const code = "var<private> a: array<f32, 2>;";
+        const array = hover(new Document(code), code.indexOf("array"));
+        expect(array?.code).toBe("array<f32, 2>");
+        expect(array?.link).toBe("https://www.w3.org/TR/WGSL/#array");
+    });
+
+    it("describes the constructors inferring their types", () => {
+        const code = "const a = array(vec2f(0, 1), vec2f(1, 0));";
+        const result = hover(new Document(code), code.indexOf("array"));
+        expect(result?.code).toBe("array<vec2<f32>, 2>");
+        expect(result?.link).toBe("https://www.w3.org/TR/WGSL/#array");
+    });
+
+    it("describes the enumerants by their enums", () => {
+        const result = hover(doc, at("uniform>", 1));
+        expect(result?.code).toBe("address space uniform");
+        expect(result?.link).toBe("https://www.w3.org/TR/WGSL/#address-spaces");
+    });
+
+    it("describes the attributes", () => {
+        const code = "@compute @workgroup_size(64, 1) fn main() {}";
+        expect(hover(new Document(code), code.indexOf("workgroup_size"))).toEqual({
+            start: code.indexOf("workgroup_size"),
+            end: code.indexOf("("),
+            code: "@workgroup_size(64, 1)",
+            documentation:
+                "Specifies the x, y, and z dimensions of the workgroup grid for the compute shader.",
+            link: "https://www.w3.org/TR/WGSL/#workgroup-size-attr",
+        });
+        expect(hover(new Document("@unknown fn f() {}"), 1)).toBeUndefined();
+    });
+
+    it("describes the builtin values by their stages and directions", () => {
+        const code = "@fragment fn main(@builtin(position) p: vec4f) {}";
+        expect(hover(new Document(code), code.indexOf("position"))).toEqual({
+            start: code.indexOf("position"),
+            end: code.indexOf(") p"),
+            code: "builtin position: vec4<f32>",
+            documentation:
+                "Vertex output: The clip position of the current vertex, in clip space coordinates.\n\n" +
+                "Fragment input: Input position of the current fragment rasterization point.",
+            link: "https://www.w3.org/TR/WGSL/#built-in-values-position",
+        });
+    });
 });
 
 describe("navigation", () => {

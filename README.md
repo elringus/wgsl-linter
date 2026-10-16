@@ -7,7 +7,7 @@ Ships as a VS Code extension, the `wgsl-lint` command-line tool and a dependency
 ## Features
 
 - Diagnostics: syntax, name resolution, type checking with the abstract numerics and overload resolution, const-evaluation of all the builtins (f16 included), uniformity analysis with the `diagnostic` filters, behavior analysis, memory layout, entry-point IO and resource bindings, address spaces and access modes, alias analysis, `enable` and `requires` directives.
-- Hover with the types, values and memory layout; inlay hints with the inferred types; completion of the names in scope, members, swizzles, builtins, attributes and enumerants; signature help.
+- Hover with the types, values and memory layout, and the builtins, attributes and predeclared types described with links to the specification; inlay hints with the inferred types; completion of the names in scope, members, swizzles, builtins, attributes and enumerants; signature help.
 - Go to definition, references, rename, document symbols, highlights and folding.
 - Formatting that keeps the line breaks of the source.
 - Semantic highlighting telling the struct constructors from the function calls and the builtins from the user declarations.
@@ -71,3 +71,4 @@ The highlighting comes from the TextMate grammars in `syntaxes`: the hosting ext
 - `bun run build` builds `dist`; `bun run vsce` packages the extension.
 - `bun run cts [query...]` runs the WebGPU conformance test suite against the analyzer, fetching the suite into `cts/suite` first. A query is a CTS query of the validation tests, as in `"webgpu:shader,validation,uniformity,*"`, or `accuracy` for checking the const-evaluation against the const cases of the execution tests; without queries, it runs all the WGSL validation tests and the accuracy check.
 - `bun scripts/builtins.ts` regenerates `src/semantic/builtins.ts` from Tint's builtin definitions.
+- `bun scripts/docs.ts` regenerates `src/service/docs.ts`, the hover descriptions of the predeclared names, from the WGSL specification.

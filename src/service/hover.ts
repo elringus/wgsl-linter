@@ -1,12 +1,15 @@
 import { Sem, type Semantics } from "../semantic/check.ts";
+import { builtinValues } from "../semantic/interface.ts";
 import { layoutOf } from "../semantic/layout.ts";
 import { functionOverloads } from "../semantic/overloads.ts";
-import { enumOf } from "../semantic/predeclared.ts";
+import { enumOf, predeclaredTypes } from "../semantic/predeclared.ts";
 import { Kind, loaded, type Type, typeName, voidType } from "../semantic/types.ts";
-import { Node, type Tree } from "../syntax/tree.ts";
+import { Node, tokenText, type Tree } from "../syntax/tree.ts";
 import { describeDeclaration, type Layout, typeLayout } from "./describe.ts";
 import type { Document } from "./document.ts";
+import * as docs from "./docs.ts";
 import { targetAt, tokenRange } from "./navigation.ts";
+import { nodeOfToken, wordAt } from "./query.ts";
 
 /** Information on a name in the source. */
 export interface Hover {
@@ -14,19 +17,18 @@ export interface Hover {
     readonly end: number;
     /** WGSL code declaring the name. */
     readonly code: string;
-    /**
-     * Memory layout of the type, struct member or buffer variable, for the types laid out in
-     * the buffers: the uniform, storage and immediate variables and the buffer views.
-     */
+    /** Memory layout, for the types laid out in buffers. */
     readonly layout?: Layout;
-    /** The comments preceding the declaration, when any. */
+    /** Markdown: the comments preceding the declaration or the specification's description. */
     readonly documentation?: string;
+    /** URL of the specification section on the predeclared name. */
+    readonly link?: string;
 }
 
 /** Returns the information on the name at the offset. */
 export function hover(doc: Document, offset: number): Hover | undefined {
     const target = targetAt(doc, offset);
-    if (!target) return undefined;
+    if (!target) return attributeHover(doc.tree, offset);
     const { tree } = doc;
     const sem = doc.semantics;
     const [start, end] = tokenRange(tree, target.node);
@@ -72,10 +74,7 @@ function isBufferSpace(view: Type): boolean {
 
 const buffers = new WeakMap<Semantics, Set<Type>>();
 
-/**
- * Returns the types laid out in the buffers: the store types of the uniform, storage and
- * immediate variables and of the buffer views, and their components.
- */
+/** Returns the types laid out in buffers, with their components. */
 function bufferTypes(sem: Semantics): Set<Type> {
     const cached = buffers.get(sem);
     if (cached) return cached;
@@ -100,41 +99,77 @@ function bufferTypes(sem: Semantics): Set<Type> {
     return found;
 }
 
-function describeBuiltin(sem: Semantics, node: number): Pick<Hover, "code" | "layout"> | undefined {
+type Description = Omit<Hover, "start" | "end">;
+
+function describeBuiltin(sem: Semantics, node: number): Description | undefined {
     const { tree, types } = sem;
     const name = tree.text.slice(...tokenRange(tree, node));
     if (tree.kinds[node] === Node.Member) {
         const type = types[node];
         return type && { code: `${name}: ${typeName(loaded(type))}` };
     }
+    const parent = tree.parents[node]!;
+    if (tree.kinds[parent] === Node.Attribute) {
+        const value = tokenText(tree, parent) === "builtin" && builtinValues.get(name);
+        return value ? documented(`builtin ${name}: ${value.type}`, docs.values[name]) : undefined;
+    }
     switch (sem.sems[node]) {
         case Sem.Function: {
-            const res = sem.overloads[tree.parents[node]!];
+            const res = sem.overloads[parent];
+            const overloads = docs.functions[name];
             if (!res) {
-                const overloads = functionOverloads(name);
-                return overloads && { code: overloads.map(o => `fn ${o.signature}`).join("\n") };
+                const code = functionOverloads(name)?.map(o => `fn ${o.signature}`);
+                return code && documented(code.join("\n"), overloads?.[0]);
             }
-            const params = res.params.map((type, i) => {
+            const paramTypes = res.params.map(typeName);
+            const params = paramTypes.map((type, i) => {
                 const param = res.overload.params[i]?.name;
-                return `${param ? `${param}: ` : ""}${typeName(type)}`;
+                return param ? `${param}: ${type}` : type;
             });
             const result = res.result === voidType ? "" : ` -> ${typeName(res.result)}`;
-            return { code: `fn ${name}(${params.join(", ")})${result}` };
+            const signature = paramTypes.join(", ");
+            const doc = overloads?.findLast(([, , types]) => !types || types.test(signature));
+            return documented(`fn ${name}(${params.join(", ")})${result}`, doc);
         }
         case Sem.Type: {
-            const type = types[node];
+            const inferred = tree.kinds[parent] === Node.Call ? types[parent] : undefined;
+            const type = types[node] ?? inferred;
             if (!type) return undefined;
             const text = typeName(type);
             const code =
-                type.kind !== Kind.Struct && text !== name ? `alias ${name} = ${text}` : text;
-            const layout = bufferTypes(sem).has(type) ? typeLayout(type) : undefined;
-            return layout ? { code, layout } : { code };
+                predeclaredTypes.has(name) && text !== name ? `alias ${name} = ${text}` : text;
+            const description = documented(code, docs.types[typeFamily.exec(name)?.[0] ?? name]);
+            return bufferTypes(sem).has(type)
+                ? { ...description, layout: typeLayout(type) }
+                : description;
         }
-        case Sem.Enum:
-            return { code: `${enumOf(name) ?? "enumerant"} ${name}` };
+        case Sem.Enum: {
+            const kind = enumOf(name);
+            const doc = kind && docs.types[kind.replace(" ", "_")];
+            return documented(`${kind ?? "enumerant"} ${name}`, doc);
+        }
         default:
             return undefined;
     }
+}
+
+const typeFamily = /^(?:vec|mat|texture_(?:depth|storage|external|multisampled)|texture)/;
+
+/** Returns the information on the attribute named at the offset. */
+function attributeHover(tree: Tree, offset: number): Hover | undefined {
+    const token = wordAt(tree.tokens, offset);
+    const attr = token < 0 ? 0 : nodeOfToken(tree, token);
+    const doc = tree.kinds[attr] === Node.Attribute && docs.attributes[tokenText(tree, attr)];
+    if (!doc) return undefined;
+    const [start, end] = tokenRange(tree, attr);
+    const code = tree.text.slice(tree.starts[attr], tree.ends[attr]).replace(/\s+/g, " ");
+    return { start, end, ...documented(code, doc) };
+}
+
+function documented(code: string, doc: docs.Doc | undefined): Description {
+    return doc
+        ? { code, documentation: doc[0], link: `${docs.specification}#${doc[1]}` }
+        : { code };
 }
 
 /** Returns the text of the line comments right before the declaration. */
