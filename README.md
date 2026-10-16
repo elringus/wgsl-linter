@@ -63,5 +63,6 @@ For highlighting, contribute the `wgsl` language with the configuration and gram
 ## Development
 
 - `bun run lint`, `bun run test`, `bun run build`; `bun run vsce` packages the extension.
+- `bun run publish` publishes the package to npm and the extension to the VS Code Marketplace.
 - `bun run cts [query...]` runs the WebGPU conformance tests against the analyzer.
 - `bun scripts/builtins.ts` and `bun scripts/docs.ts` regenerate the builtin tables from Tint and the hover descriptions from the spec.

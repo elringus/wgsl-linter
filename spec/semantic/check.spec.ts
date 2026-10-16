@@ -145,6 +145,12 @@ describe("validation", () => {
             "entry point 'f' references multiple variables that use the same resource binding @group(0), @binding(0)",
         ]);
     });
+
+    it("reports a function-scope handle variable at its declaration", () => {
+        const code = "fn f() { var t: texture_2d<f32>; }";
+        const [error] = lint(code);
+        expect(code.slice(error!.start, error!.end)).toBe("var t: texture_2d<f32>;");
+    });
 });
 
 describe("alias analysis", () => {

@@ -1108,54 +1108,66 @@ class Checker {
     private varDecl(decl: number, global: boolean): Type | undefined {
         const { tree } = this;
         const template = childOf(tree, decl, Node.Template);
-        let space: AddressSpace | undefined;
-        let access: Access | undefined;
-        if (template) {
-            const args = this.attributeArgs(template);
-            const spaceArg = args[0];
-            if (spaceArg) {
-                const name = this.enumerant(spaceArg, "address space");
-                if (name) {
-                    if (
-                        name === "immediate" &&
-                        !this.supportedFeatures.has("immediate_address_space")
-                    )
-                        this.error(spaceArg, "the immediate address space is not supported");
-                    space = name as AddressSpace;
-                }
-            }
-            const accessArg = args[1];
-            if (accessArg) {
-                const name = this.enumerant(accessArg, "access");
-                if (name) access = name as Access;
-                if (space && space !== "storage") {
-                    this.error(
-                        accessArg,
-                        "only variables in <storage> address space may specify an access mode",
-                    );
-                    access = undefined;
-                }
-            }
-            if (args.length > 2) this.error(args[2]!, "'var' template list has too many arguments");
-            if (args.length === 0 || (spaceArg && !space)) return undefined;
-        }
+        const explicit: { space?: AddressSpace; access?: Access } | undefined = template
+            ? this.varTemplate(template)
+            : {};
+        if (!explicit) return undefined;
         const annotated = this.typeAnnotation(decl);
         if (childOf(tree, decl, Node.Type) && !annotated) return undefined;
         const init = initializerOf(tree, decl);
-        let initType: Type | undefined;
-        if (init) {
-            initType = this.value(init);
-            if (!initType) return undefined;
-        }
-        let store = annotated;
+        const initType = init ? this.value(init) : undefined;
+        if (init && !initType) return undefined;
+        const store = annotated ?? (initType && concretize(initType));
         if (!store) {
-            if (!initType) {
-                this.error(this.nameNode(decl), "'var' declaration requires a type or initializer");
-                return undefined;
-            }
-            store = concretize(initType);
+            this.error(this.nameNode(decl), "'var' declaration requires a type or initializer");
+            return undefined;
         }
-        if (!space) space = global ? (isHandle(store) ? "handle" : undefined) : "function";
+        const space = this.varSpace(decl, template, explicit.space, store, global);
+        if (!space) return undefined;
+        const access = explicit.access ?? defaultAccess(space);
+        const storeNode = childOf(tree, decl, Node.Type)
+            ? this.typeNode(decl)
+            : this.nameNode(decl);
+        if (!this.validStoreType(storeNode, store, space, access, true)) return undefined;
+        if (init && initType && !this.varInitializer(init, initType, store, space, global))
+            return undefined;
+        const type = reference(space, store, access);
+        this.types[decl] = type;
+        this.stages[decl] = Stage.Runtime;
+        return type;
+    }
+
+    /** Checks the template list of a variable declaration; returns its address space and access. */
+    private varTemplate(template: number): { space: AddressSpace; access?: Access } | undefined {
+        const [spaceArg, accessArg, extraArg] = this.attributeArgs(template);
+        const space = spaceArg
+            ? (this.enumerant(spaceArg, "address space") as AddressSpace | undefined)
+            : undefined;
+        if (space === "immediate" && !this.supportedFeatures.has("immediate_address_space"))
+            this.error(spaceArg!, "the immediate address space is not supported");
+        let access = accessArg
+            ? (this.enumerant(accessArg, "access") as Access | undefined)
+            : undefined;
+        if (accessArg && space && space !== "storage") {
+            this.error(
+                accessArg,
+                "only variables in <storage> address space may specify an access mode",
+            );
+            access = undefined;
+        }
+        if (extraArg) this.error(extraArg, "'var' template list has too many arguments");
+        return space && { space, access };
+    }
+
+    /** Returns the address space of a variable, explicit or default; reports the invalid ones. */
+    private varSpace(
+        decl: number,
+        template: number,
+        explicit: AddressSpace | undefined,
+        store: Type,
+        global: boolean,
+    ): AddressSpace | undefined {
+        const space = explicit ?? (global ? (isHandle(store) ? "handle" : undefined) : "function");
         if (!space) {
             this.error(
                 this.nameNode(decl),
@@ -1164,52 +1176,47 @@ class Checker {
             return undefined;
         }
         if (global && space === "function") {
-            this.error(template!, "module-scope 'var' must not use address space 'function'");
+            this.error(template, "module-scope 'var' must not use address space 'function'");
             return undefined;
         }
         if (!global && space !== "function") {
             this.error(
-                template!,
+                template,
                 `function-scope 'var' declaration must use 'function' address space`,
             );
             return undefined;
         }
         if (isHandle(store) && space !== "handle") {
             this.error(
-                template ?? decl,
+                template || decl,
                 `variables of type '${typeName(store)}' must not specify an address space`,
             );
             return undefined;
         }
-        access ??=
-            space === "storage" ||
-            space === "uniform" ||
-            space === "handle" ||
-            space === "immediate"
-                ? "read"
-                : "read_write";
-        const storeNode = childOf(tree, decl, Node.Type)
-            ? this.typeNode(decl)
-            : this.nameNode(decl);
-        if (!this.validStoreType(storeNode, store, space, access, true)) return undefined;
-        if (init && initType) {
-            if (space !== "function" && space !== "private") {
-                this.error(init, `var of address space '${space}' cannot have an initializer`);
-                return undefined;
-            }
-            if (global && this.stages[init] === Stage.Runtime) {
-                this.error(
-                    init,
-                    "module-scope 'var' initializer must be a const-expression or override-expression",
-                );
-                return undefined;
-            }
-            this.convert(init, initType, store, "initialize");
+        return space;
+    }
+
+    /** Checks the initializer of a variable in the address space; returns whether it's valid. */
+    private varInitializer(
+        init: number,
+        initType: Type,
+        store: Type,
+        space: AddressSpace,
+        global: boolean,
+    ): boolean {
+        if (space !== "function" && space !== "private") {
+            this.error(init, `var of address space '${space}' cannot have an initializer`);
+            return false;
         }
-        const type = reference(space, store, access);
-        this.types[decl] = type;
-        this.stages[decl] = Stage.Runtime;
-        return type;
+        if (global && this.stages[init] === Stage.Runtime) {
+            this.error(
+                init,
+                "module-scope 'var' initializer must be a const-expression or override-expression",
+            );
+            return false;
+        }
+        this.convert(init, initType, store, "initialize");
+        return true;
     }
 
     /** Validates the store type of a variable or pointer in the address space with the access mode. */
@@ -1733,140 +1740,151 @@ class Checker {
             return name === "buffer" && this.supportedFeatures.has("buffer_view")
                 ? unsizedBuffer
                 : undefined;
-        const typeArg = (i: number): Type | undefined => {
-            const arg = args[i];
-            return arg === undefined ? undefined : this.type(arg);
-        };
-        const count = (n: number): boolean => {
-            if (args.length === n) return true;
-            this.error(node, `'${name}' requires ${n} template argument${n > 1 ? "s" : ""}`);
-            return false;
-        };
-        if (name.startsWith("vec")) {
-            if (!count(1)) return undefined;
-            const elem = typeArg(0);
-            if (!elem) return undefined;
-            if (!isScalar(elem)) {
-                this.error(args[0]!, "vector element type must be a scalar type");
-                return undefined;
-            }
-            return vec(+name[3]!, elem);
-        }
-        if (name.startsWith("mat")) {
-            if (!count(1)) return undefined;
-            const elem = typeArg(0);
-            if (!elem) return undefined;
-            if (elem.kind !== Kind.F32 && elem.kind !== Kind.F16) {
-                this.error(args[0]!, "matrix element type must be 'f32' or 'f16'");
-                return undefined;
-            }
-            return mat(+name[3]!, +name[5]!, elem);
-        }
+        if (name.startsWith("vec")) return this.vectorType(node, name, args);
+        if (name.startsWith("mat")) return this.matrixType(node, name, args);
+        if (name.startsWith("texture_storage")) return this.storageTextureType(node, name, args);
+        if (name.startsWith("texture")) return this.sampledTextureType(node, name, args);
         switch (name) {
-            case "atomic": {
-                if (!count(1)) return undefined;
-                const elem = typeArg(0);
-                if (!elem) return undefined;
-                const vec2u = elem === vec(2, u32) && this.extensions.has("atomic_vec2u_min_max");
-                if (elem.kind !== Kind.I32 && elem.kind !== Kind.U32 && !vec2u) {
-                    this.error(args[0]!, "atomic only supports i32 or u32 types");
-                    return undefined;
-                }
-                return atomic(elem);
-            }
+            case "atomic":
+                return this.atomicType(node, args);
             case "array":
                 return this.arrayType(node, args);
-            case "ptr": {
-                if (args.length < 2 || args.length > 3) {
-                    this.error(node, "'ptr' requires 2 or 3 template arguments");
-                    return undefined;
-                }
-                const space = this.enumerant(args[0]!, "address space") as AddressSpace | undefined;
-                const store = typeArg(1);
-                let access: Access | undefined;
-                if (args.length === 3) {
-                    access = this.enumerant(args[2]!, "access") as Access | undefined;
-                    if (!access) return undefined;
-                    if (space && space !== "storage") {
-                        this.error(
-                            args[2]!,
-                            "only pointers in <storage> address space may specify an access mode",
-                        );
-                        return undefined;
-                    }
-                }
-                if (!space || !store) return undefined;
-                if (
-                    space === "immediate" &&
-                    !this.supportedFeatures.has("immediate_address_space")
-                ) {
-                    this.error(args[0]!, "the immediate address space is not supported");
-                    return undefined;
-                }
-                if (isHandle(store)) {
-                    this.error(
-                        args[1]!,
-                        `pointer can not be formed to handle type '${typeName(store)}'`,
-                    );
-                    return undefined;
-                }
-                access ??=
-                    space === "storage" || space === "uniform" || space === "immediate"
-                        ? "read"
-                        : "read_write";
-                if (!this.validStoreType(args[1]!, store, space, access, false)) return undefined;
-                return pointer(space, store, access);
-            }
-            case "buffer": {
-                if (!this.supportedFeatures.has("buffer_view")) return undefined;
-                if (!count(1)) return undefined;
-                const size = this.arrayCount(args[0]!);
-                if (size === undefined) return undefined;
-                if (size === -1) return overrideBuffer(this.overrideKey(args[0]!), this.interned);
-                const align = this.extensions.has("f16") ? 2 : 4;
-                if (size % align !== 0) {
-                    this.error(args[0]!, `buffer size must be a multiple of ${align}`);
-                    return undefined;
-                }
-                return buffer(size);
-            }
+            case "ptr":
+                return this.pointerType(node, args);
+            case "buffer":
+                return this.bufferType(node, args);
+            default:
+                return undefined;
         }
-        if (name.startsWith("texture_storage")) {
-            if (!count(2)) return undefined;
-            const format = this.enumerant(args[0]!, "texel format");
-            const access = this.enumerant(args[1]!, "access") as Access | undefined;
-            if (!format || !access) return undefined;
-            if (
-                access !== "write" &&
-                !this.supportedFeatures.has("readonly_and_readwrite_storage_textures")
-            ) {
-                this.error(args[1]!, `storage texture access mode '${access}' is not supported`);
+    }
+
+    /** Whether the type generator has the template arguments it requires; reports otherwise. */
+    private arity(node: number, name: string, args: readonly number[], n: number): boolean {
+        if (args.length === n) return true;
+        this.error(node, `'${name}' requires ${n} template argument${n > 1 ? "s" : ""}`);
+        return false;
+    }
+
+    private vectorType(node: number, name: string, args: readonly number[]): Type | undefined {
+        if (!this.arity(node, name, args, 1)) return undefined;
+        const elem = this.type(args[0]!);
+        if (!elem) return undefined;
+        if (!isScalar(elem)) {
+            this.error(args[0]!, "vector element type must be a scalar type");
+            return undefined;
+        }
+        return vec(+name[3]!, elem);
+    }
+
+    private matrixType(node: number, name: string, args: readonly number[]): Type | undefined {
+        if (!this.arity(node, name, args, 1)) return undefined;
+        const elem = this.type(args[0]!);
+        if (!elem) return undefined;
+        if (elem.kind !== Kind.F32 && elem.kind !== Kind.F16) {
+            this.error(args[0]!, "matrix element type must be 'f32' or 'f16'");
+            return undefined;
+        }
+        return mat(+name[3]!, +name[5]!, elem);
+    }
+
+    private atomicType(node: number, args: readonly number[]): Type | undefined {
+        if (!this.arity(node, "atomic", args, 1)) return undefined;
+        const elem = this.type(args[0]!);
+        if (!elem) return undefined;
+        const vec2u = elem === vec(2, u32) && this.extensions.has("atomic_vec2u_min_max");
+        if (elem.kind !== Kind.I32 && elem.kind !== Kind.U32 && !vec2u) {
+            this.error(args[0]!, "atomic only supports i32 or u32 types");
+            return undefined;
+        }
+        return atomic(elem);
+    }
+
+    private pointerType(node: number, args: readonly number[]): Type | undefined {
+        if (args.length < 2 || args.length > 3) {
+            this.error(node, "'ptr' requires 2 or 3 template arguments");
+            return undefined;
+        }
+        const space = this.enumerant(args[0]!, "address space") as AddressSpace | undefined;
+        const store = this.type(args[1]!);
+        let access: Access | undefined;
+        if (args.length === 3) {
+            access = this.enumerant(args[2]!, "access") as Access | undefined;
+            if (!access) return undefined;
+            if (space && space !== "storage") {
+                this.error(
+                    args[2]!,
+                    "only pointers in <storage> address space may specify an access mode",
+                );
                 return undefined;
             }
-            if (
-                !storageFormats.has(format) &&
-                !(tier1Formats.has(format) && this.supportedFeatures.has("texture_formats_tier1"))
-            ) {
-                this.error(args[0]!, `'${format}' is not a valid storage texture format`);
-                return undefined;
-            }
-            return storageTexture(name, format, access);
         }
-        if (name.startsWith("texture")) {
-            if (!count(1)) return undefined;
-            const sampled = typeArg(0);
-            if (!sampled) return undefined;
-            if (
-                sampled.kind !== Kind.F32 &&
-                sampled.kind !== Kind.I32 &&
-                sampled.kind !== Kind.U32
-            ) {
-                this.error(args[0]!, "texture sampled type must be f32, i32 or u32");
-                return undefined;
-            }
-            return sampledTexture(name, sampled);
+        if (!space || !store) return undefined;
+        if (space === "immediate" && !this.supportedFeatures.has("immediate_address_space")) {
+            this.error(args[0]!, "the immediate address space is not supported");
+            return undefined;
         }
-        return undefined;
+        if (isHandle(store)) {
+            this.error(args[1]!, `pointer can not be formed to handle type '${typeName(store)}'`);
+            return undefined;
+        }
+        access ??= defaultAccess(space);
+        if (!this.validStoreType(args[1]!, store, space, access, false)) return undefined;
+        return pointer(space, store, access);
+    }
+
+    private bufferType(node: number, args: readonly number[]): Type | undefined {
+        if (!this.supportedFeatures.has("buffer_view")) return undefined;
+        if (!this.arity(node, "buffer", args, 1)) return undefined;
+        const size = this.arrayCount(args[0]!);
+        if (size === undefined) return undefined;
+        if (size === -1) return overrideBuffer(this.overrideKey(args[0]!), this.interned);
+        const align = this.extensions.has("f16") ? 2 : 4;
+        if (size % align !== 0) {
+            this.error(args[0]!, `buffer size must be a multiple of ${align}`);
+            return undefined;
+        }
+        return buffer(size);
+    }
+
+    private storageTextureType(
+        node: number,
+        name: string,
+        args: readonly number[],
+    ): Type | undefined {
+        if (!this.arity(node, name, args, 2)) return undefined;
+        const format = this.enumerant(args[0]!, "texel format");
+        const access = this.enumerant(args[1]!, "access") as Access | undefined;
+        if (!format || !access) return undefined;
+        if (
+            access !== "write" &&
+            !this.supportedFeatures.has("readonly_and_readwrite_storage_textures")
+        ) {
+            this.error(args[1]!, `storage texture access mode '${access}' is not supported`);
+            return undefined;
+        }
+        if (
+            !storageFormats.has(format) &&
+            !(tier1Formats.has(format) && this.supportedFeatures.has("texture_formats_tier1"))
+        ) {
+            this.error(args[0]!, `'${format}' is not a valid storage texture format`);
+            return undefined;
+        }
+        return storageTexture(name, format, access);
+    }
+
+    private sampledTextureType(
+        node: number,
+        name: string,
+        args: readonly number[],
+    ): Type | undefined {
+        if (!this.arity(node, name, args, 1)) return undefined;
+        const sampled = this.type(args[0]!);
+        if (!sampled) return undefined;
+        if (sampled.kind !== Kind.F32 && sampled.kind !== Kind.I32 && sampled.kind !== Kind.U32) {
+            this.error(args[0]!, "texture sampled type must be f32, i32 or u32");
+            return undefined;
+        }
+        return sampledTexture(name, sampled);
     }
 
     private arrayType(node: number, args: readonly number[]): Type | undefined {
@@ -2339,43 +2357,7 @@ class Checker {
                 } else selectors.push(s);
             }
         if (defaults === 0) this.error(node, "switch statement must have a default clause");
-        let common = selectorType;
-        const types: (Type | undefined)[] = [];
-        for (const s of selectors) {
-            const type = this.value(s);
-            types.push(type);
-            if (!type) continue;
-            if (!isIntegerScalarType(type)) {
-                this.error(s, "case selector must be an i32 or u32 value");
-                continue;
-            }
-            if (this.stages[s] !== Stage.Const) {
-                this.error(s, "case selector must be a const-expression");
-                continue;
-            }
-            if (common) {
-                const merged = commonType(common, type);
-                if (!merged)
-                    this.error(
-                        s,
-                        `the case selector values must have the same type as the selector expression`,
-                    );
-                else common = merged;
-            } else common = type;
-        }
-        if (common && common.kind === Kind.AbstractInt) common = i32;
-        const seen = new Map<string, number>();
-        for (let i = 0; i < selectors.length; i++) {
-            const s = selectors[i]!;
-            const type = types[i];
-            if (!type || !common || !isIntegerScalarType(type) || this.stages[s] !== Stage.Const)
-                continue;
-            const value = this.convert(s, type, common, "convert");
-            if (value === undefined) continue;
-            const key = String(value);
-            if (seen.has(key)) this.error(s, `duplicate switch case '${key}'`);
-            else seen.set(key, s);
-        }
+        this.caseSelectors(selectors, selectorType);
         let behavior = 0;
         this.scopes.push(Scope.Switch);
         for (const clause of clauses) {
@@ -2385,6 +2367,42 @@ class Checker {
         this.scopes.pop();
         if (behavior & Behavior.Break) behavior = (behavior | Behavior.Next) & ~Behavior.Break;
         return behavior;
+    }
+
+    /** Checks the case selectors are distinct const integers of the selector's type. */
+    private caseSelectors(selectors: readonly number[], selectorType: Type | undefined): void {
+        let common = selectorType;
+        const valid: [number, Type][] = [];
+        for (const s of selectors) {
+            const type = this.value(s);
+            if (!type) continue;
+            if (!isIntegerScalarType(type)) {
+                this.error(s, "case selector must be an i32 or u32 value");
+                continue;
+            }
+            if (this.stages[s] !== Stage.Const) {
+                this.error(s, "case selector must be a const-expression");
+                continue;
+            }
+            valid.push([s, type]);
+            const merged = common ? commonType(common, type) : type;
+            if (merged) common = merged;
+            else
+                this.error(
+                    s,
+                    `the case selector values must have the same type as the selector expression`,
+                );
+        }
+        if (!common) return;
+        if (common.kind === Kind.AbstractInt) common = i32;
+        const seen = new Set<string>();
+        for (const [s, type] of valid) {
+            const value = this.convert(s, type, common, "convert");
+            if (value === undefined) continue;
+            const key = String(value);
+            if (seen.has(key)) this.error(s, `duplicate switch case '${key}'`);
+            else seen.add(key);
+        }
     }
 
     private loop(node: number): number {
@@ -3724,6 +3742,12 @@ class Checker {
 function isNumericScalarOrVector(type: Type): boolean {
     const scalar = type.kind === Kind.Vector ? type.elem! : type;
     return scalar.kind >= Kind.I32 && scalar.kind <= Kind.F16;
+}
+
+function defaultAccess(space: AddressSpace): Access {
+    return space === "function" || space === "private" || space === "workgroup"
+        ? "read_write"
+        : "read";
 }
 
 function isIntegerScalarType(type: Type): boolean {

@@ -3,6 +3,11 @@
     "displayName": "WGSL Linter",
     "version": "0.0.1",
     "description": "WGSL language support: semantic highlighting, diagnostics, completion, hover, navigation, rename and formatting.",
+    "categories": [
+        "Formatters",
+        "Linters",
+        "Programming Languages"
+    ],
     "keywords": [
         "cli",
         "formatter",
@@ -44,6 +49,7 @@
         "cts": "bun scripts/cts.ts",
         "build": "vp pack",
         "vsce": "bun run build && vsce package --no-dependencies --out dist",
+        "publish": "bun scripts/publish.ts",
         "update": "bun update -i -r --latest"
     },
     "devDependencies": {
