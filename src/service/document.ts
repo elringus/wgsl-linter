@@ -60,35 +60,60 @@ export class Document {
      * those at the placeholders, and the unresolved names when a placeholder may declare them.
      */
     diagnostics(): Diagnostic[] {
-        const { tree, resolution, semantics, base } = this;
+        return this.triage().certain;
+    }
+
+    /** Returns the unresolved names left unreported, as a placeholder may declare them. */
+    uncheckedNames(): string[] {
+        return this.triage().unchecked;
+    }
+
+    /** Returns the start and end of the placeholder touching the range, if any. */
+    placeholderAt(start: number, end: number = start): [number, number] | undefined {
         const placeholders = this.options.placeholders ?? [];
-        const opaque = this.declaresOpaquely(placeholders);
-        const certain = (d: Diagnostic): boolean => {
-            if (d.start < base) return false;
-            for (let i = 0; i < placeholders.length; i += 2)
-                if (d.start <= placeholders[i + 1]! + base && d.end >= placeholders[i]! + base)
-                    return false;
-            return !opaque || !this.isUnresolved(d);
-        };
-        return [...tree.diagnostics, ...resolution.diagnostics, ...semantics.diagnostics]
-            .filter(certain)
-            .sort((a, b) => a.start - b.start);
+        for (let i = 0; i < placeholders.length; i += 2) {
+            const from = placeholders[i]! + this.base;
+            const to = placeholders[i + 1]! + this.base;
+            if (start <= to && end >= from) return [from, to];
+        }
+        return undefined;
     }
 
     /**
-     * Whether any placeholder stands for declarations or statements rather than an expression,
-     * which shows as a syntax error at it or at the token after it.
+     * Returns the start and end of the placeholders standing for declarations or statements
+     * rather than expressions, which show as syntax errors at them or at the tokens after them.
      */
-    private declaresOpaquely(placeholders: readonly number[]): boolean {
+    declaringPlaceholders(): [number, number][] {
         const { tree, base } = this;
         const { tokens } = tree;
+        const placeholders = this.options.placeholders ?? [];
+        const declaring: [number, number][] = [];
         for (let i = 0; i < placeholders.length; i += 2) {
             const start = placeholders[i]! + base;
             const next = Math.min(tokenIndex(tokens, start) + 1, tokens.count - 1);
             const end = tokens.ends[next]!;
-            if (tree.diagnostics.some(d => d.start >= start && d.start <= end)) return true;
+            if (tree.diagnostics.some(d => d.start >= start && d.start <= end))
+                declaring.push([start, placeholders[i + 1]! + base]);
         }
-        return false;
+        return declaring;
+    }
+
+    /** Splits the diagnostics of the text into the certain ones and the unchecked names. */
+    private triage(): { certain: Diagnostic[]; unchecked: string[] } {
+        const { tree, resolution, semantics, base } = this;
+        const declaring = this.declaringPlaceholders().length > 0;
+        const certain: Diagnostic[] = [];
+        const unchecked = new Set<string>();
+        for (const d of [
+            ...tree.diagnostics,
+            ...resolution.diagnostics,
+            ...semantics.diagnostics,
+        ]) {
+            if (d.start < base || this.placeholderAt(d.start, d.end)) continue;
+            if (declaring && this.isUnresolved(d)) unchecked.add(this.source.slice(d.start, d.end));
+            else certain.push(d);
+        }
+        return { certain: certain.sort((a, b) => a.start - b.start), unchecked: [...unchecked] };
     }
 
     /** Whether the diagnostic is reported at a name that doesn't resolve to a declaration. */

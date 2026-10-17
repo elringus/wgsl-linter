@@ -168,6 +168,17 @@ fn f(b: vec2<bool>) {
         expect(hover(new Document("@unknown fn f() {}"), 1)).toBeUndefined();
     });
 
+    it("explains the substitutions are opaque, listing the names they may declare", () => {
+        const opaque = "Opaque to the linter: the checks depending on it are skipped.";
+        const expression = new Document("const x = _p___ + 1;", { placeholders: [10, 15] });
+        expect(hover(expression, 12)).toEqual({ start: 10, end: 15, documentation: opaque });
+        const text = "_p______\nvar<private> l: Light;";
+        const declaring = new Document(text, { placeholders: [0, 8] });
+        expect(hover(declaring, 3)?.documentation).toBe(
+            `${opaque}\n\nUnresolved names aren't reported, as it may declare them: \`Light\`.`,
+        );
+    });
+
     it("describes the builtin values by their stages and directions", () => {
         const code = "@fragment fn main(@builtin(position) p: vec4f) {}";
         expect(hover(new Document(code), code.indexOf("position"))).toEqual({

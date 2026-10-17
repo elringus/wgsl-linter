@@ -34,11 +34,20 @@ describe("document", () => {
         expect(doc.diagnostics().map(d => d.message)).toEqual([
             "value -1 cannot be represented as 'u32'",
         ]);
+        expect(doc.uncheckedNames()).toEqual(["Light"]);
+        expect(doc.declaringPlaceholders()).toEqual([[0, 8]]);
+    });
+
+    it("leaves no names unchecked when they all resolve", () => {
+        const text = "_p______\nconst x = 1;";
+        const doc = new Document(text, { placeholders: [0, 8] });
+        expect(doc.uncheckedNames()).toEqual([]);
     });
 
     it("keeps the unresolved names when the placeholders are expressions", () => {
         const text = "var<private> l: Light = _p___;";
         const doc = new Document(text, { placeholders: [24, 29] });
         expect(doc.diagnostics().map(d => d.message)).toEqual(["unresolved identifier 'Light'"]);
+        expect(doc.declaringPlaceholders()).toEqual([]);
     });
 });

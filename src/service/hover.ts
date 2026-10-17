@@ -16,7 +16,7 @@ export interface Hover {
     readonly start: number;
     readonly end: number;
     /** WGSL code declaring the name. */
-    readonly code: string;
+    readonly code?: string;
     /** Memory layout, for the types laid out in buffers. */
     readonly layout?: Layout;
     /** Markdown: the comments preceding the declaration or the specification's description. */
@@ -27,6 +27,8 @@ export interface Hover {
 
 /** Returns the information on the name at the offset. */
 export function hover(doc: Document, offset: number): Hover | undefined {
+    const placeholder = doc.placeholderAt(offset);
+    if (placeholder) return substitutionHover(doc, placeholder);
     const target = targetAt(doc, offset);
     if (!target) return attributeHover(doc.tree, offset);
     const { tree } = doc;
@@ -46,6 +48,18 @@ export function hover(doc: Document, offset: number): Hover | undefined {
         ...(layout && { layout }),
         ...(documentation && { documentation }),
     };
+}
+
+/** Returns the information on the substitution standing at the placeholder. */
+function substitutionHover(doc: Document, [start, end]: [number, number]): Hover {
+    const opaque = "Opaque to the linter: the checks depending on it are skipped.";
+    const declaring = doc.declaringPlaceholders().some(([from]) => from === start);
+    const names = declaring ? doc.uncheckedNames().map(name => `\`${name}\``) : [];
+    const documentation =
+        names.length > 0
+            ? `${opaque}\n\nUnresolved names aren't reported, as it may declare them: ${names.join(", ")}.`
+            : opaque;
+    return { start, end, documentation };
 }
 
 /** Returns the memory layout of the buffer variable, or of the struct or member in a buffer. */

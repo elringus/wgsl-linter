@@ -208,7 +208,8 @@ class Features {
     private lint(document: vscode.TextDocument): void {
         if (!this.isRelevant(document)) return;
         const diagnostics: vscode.Diagnostic[] = [];
-        for (const region of this.regions(document))
+        for (const region of this.regions(document)) {
+            diagnostics.push(...this.uncheckedMarkers(document, region));
             for (const d of region.doc.diagnostics()) {
                 const range = this.range(document, region, d)!;
                 const diagnostic = new vscode.Diagnostic(range, d.message, severity(d.severity));
@@ -226,7 +227,23 @@ class Features {
                 });
                 diagnostics.push(diagnostic);
             }
+        }
         this.diagnostics.set(document.uri, diagnostics);
+    }
+
+    /** Marks the substitutions that may declare the names left unchecked, to hover for details. */
+    private uncheckedMarkers(document: vscode.TextDocument, region: Region): vscode.Diagnostic[] {
+        if (region.doc.uncheckedNames().length === 0) return [];
+        return region.doc.declaringPlaceholders().map(([start, end]) => {
+            const range = this.range(document, region, { start, end })!;
+            const marker = new vscode.Diagnostic(
+                range,
+                "some names in this template aren't checked",
+                vscode.DiagnosticSeverity.Hint,
+            );
+            marker.source = "wgsl";
+            return marker;
+        });
     }
 
     private semanticTokens(
@@ -256,12 +273,14 @@ class Features {
         const at = this.at(document, position);
         const result = at && hover(at[0].doc, at[1]);
         if (!result) return undefined;
-        const contents = new vscode.MarkdownString().appendCodeblock(result.code, "wgsl");
+        const contents = new vscode.MarkdownString();
+        if (result.code) contents.appendCodeblock(result.code, "wgsl");
         const sections: string[] = [];
         if (result.documentation) sections.push(result.documentation);
         if (result.layout) sections.push(layoutLine(result.layout));
         if (result.link) sections.push(`[Specification](${result.link})`);
-        if (sections.length > 0) contents.appendMarkdown(`\n\n---\n\n${sections.join("\n\n")}`);
+        if (sections.length > 0)
+            contents.appendMarkdown(`${result.code ? "\n\n---\n\n" : ""}${sections.join("\n\n")}`);
         return new vscode.Hover(contents, this.range(document, at[0], result));
     }
 
