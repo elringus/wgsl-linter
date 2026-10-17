@@ -74,6 +74,25 @@ export function register(
 
 export { register as activate };
 
+/** Formats the WGSL templates with the tags in the editor's document. */
+export function formatTemplates(
+    { document, options }: vscode.TextEditor,
+    edit: vscode.TextEditorEdit,
+    tags: readonly string[] = ["wgsl"],
+): void {
+    const text = document.getText();
+    const indent = indentOf(options as vscode.FormattingOptions);
+    for (const template of extractTemplates(text, tags)) {
+        const formatted = formatTemplate(text, template, indent);
+        if (formatted === text.slice(template.start, template.end)) continue;
+        const range = new vscode.Range(
+            document.positionAt(template.start),
+            document.positionAt(template.end),
+        );
+        edit.replace(range, formatted);
+    }
+}
+
 class Features {
     private readonly tags: readonly string[];
     private readonly cache = new Map<string, { version: number; regions: Region[] }>();

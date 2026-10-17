@@ -68,6 +68,8 @@ export function activate(context: vscode.ExtensionContext) {
 
 For highlighting, contribute the `wgsl` language with the configuration and grammars in `syntaxes`, as this repository's `package.json` does.
 
+To format all the templates in a document at once, for example from a command, call `formatTemplates(editor, edit, tags)` within a text editor command.
+
 ## Development
 
 - `bun run lint`, `bun run test`, `bun run build`; `bun run vsce` packages the extension.

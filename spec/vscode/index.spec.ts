@@ -156,7 +156,7 @@ const vscode = vi.hoisted(() => {
 
 vi.mock("vscode", () => vscode);
 
-const { register } = await import("../../src/vscode/index.ts");
+const { register, formatTemplates } = await import("../../src/vscode/index.ts");
 
 /** A text document of the VS Code API over the text. */
 function document(text: string, languageId: string, uri = `file:///${languageId}`) {
@@ -308,5 +308,26 @@ describe("vscode adapter", () => {
             title: string;
         }[];
         expect(actions.map(a => a.title)).toEqual(["Format WGSL template"]);
+    });
+
+    it("formats all the changed templates with the tags in the editor's document", () => {
+        const text =
+            "const a = wgsl`fn a()->f32{return 1.0;}`;\n" +
+            "const b = wgsl`\n    fn b() { }\n`;\n" +
+            "const c = shader`fn c(){}`;\n";
+        const doc = document(text, "typescript", "file:///templates");
+        const editor = { document: doc, options: { insertSpaces: true, tabSize: 4 } };
+        const format = (tags?: string[]) => {
+            const replaced: string[] = [];
+            const edit = { replace: (_: unknown, text: string) => replaced.push(text) };
+            formatTemplates(editor as never, edit as never, tags);
+            return replaced;
+        };
+        const at = new vscode.Range(new vscode.Position(0, 16), new vscode.Position(0, 16));
+        const [action] = call("actions", "provideCodeActions", doc, at) as {
+            edit: { edits: [unknown, string][] };
+        }[];
+        expect(format()).toEqual([action!.edit.edits[0]![1]]);
+        expect(format(["shader"])).toHaveLength(1);
     });
 });
