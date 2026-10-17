@@ -8,5 +8,10 @@ const { version } = (await Bun.file(new URL("../package.json", import.meta.url))
 };
 
 await $`bun run vsce`;
-await $`npm publish --ignore-scripts`; // ignore-scripts, as otherwise npm reruns this script as hook
+// Attached to the terminal for npm to prompt for the one-time password;
+// ignore-scripts, as otherwise npm reruns this script as hook.
+const npm = Bun.spawnSync(["npm", "publish", "--ignore-scripts"], {
+    stdio: ["inherit", "inherit", "inherit"],
+});
+if (npm.exitCode !== 0) process.exit(npm.exitCode);
 await $`bunx vsce publish --packagePath dist/wgsl-linter-${version}.vsix`;
