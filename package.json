@@ -1,7 +1,7 @@
 {
     "name": "wgsl-linter",
     "displayName": "WGSL Linter",
-    "version": "0.2.0",
+    "version": "0.2.1",
     "description": "WGSL language support: semantic highlighting, diagnostics, completion, hover, navigation, rename and formatting.",
     "categories": [
         "Formatters",

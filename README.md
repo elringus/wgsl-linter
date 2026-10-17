@@ -10,7 +10,9 @@
 
 # WGSL Linter
 
-WGSL language support for `.wgsl` files and WGSL templates embedded in JS/TS: a VS Code extension, the `wgsl-lint` command-line tool and a dependency-free analyzer library. Shaders are validated the way Chrome does, with all the errors reported at once.
+Language support for WGSL files and templates embedded in JS/TS: a VS Code extension, the `wgsl-lint` command-line tool and a dependency-free analyzer library. Validation [matches Chrome](cts/README.md) and reports all the errors at once.
+
+![WGSL Linter in VS Code](assets/screenshot.png)
 
 ## Features
 
