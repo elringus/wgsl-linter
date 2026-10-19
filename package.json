@@ -1,7 +1,7 @@
 {
     "name": "wgsl-linter",
     "displayName": "WGSL Linter",
-    "version": "0.3.0",
+    "version": "0.4.1",
     "description": "WGSL language support: semantic highlighting, diagnostics, completion, hover, navigation, rename and formatting.",
     "categories": [
         "Formatters",
@@ -30,7 +30,8 @@
         "wgsl-lint": "dist/cli.js"
     },
     "type": "module",
-    "main": "./dist/vscode.js",
+    "main": "./dist/vscode.cjs",
+    "browser": "./dist/vscode.cjs",
     "exports": {
         ".": "./dist/index.js",
         "./vscode": "./dist/vscode.js"
@@ -133,5 +134,11 @@
     "icon": "assets/logo.png",
     "engines": {
         "vscode": "^1.140.0"
+    },
+    "capabilities": {
+        "virtualWorkspaces": true,
+        "untrustedWorkspaces": {
+            "supported": true
+        }
     }
 }

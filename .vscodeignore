@@ -1,5 +1,5 @@
 **
-!dist/vscode.js
+!dist/vscode.cjs
 !syntaxes/*.json
 !assets/logo.png
 !assets/file-*.svg

@@ -1,16 +1,20 @@
 import { defineConfig } from "vite-plus";
 
-const entries = { index: "src/index.ts", vscode: "src/vscode/index.ts", cli: "src/cli.ts" };
-
 export default defineConfig({
-    pack: Object.entries(entries).map(([name, source]) => ({
-        entry: { [name]: source },
-        dts: name !== "cli" && { generator: "oxc" },
-        clean: false,
-        fixedExtension: false,
-        deps: { neverBundle: ["vscode"] },
-        banner: "/* eslint-disable */",
-    })),
+    pack: [
+        {
+            entry: { index: "src/index.ts", vscode: "src/vscode/index.ts", cli: "src/cli.ts" },
+            dts: { generator: "oxc" },
+            fixedExtension: false,
+            deps: { neverBundle: ["vscode"] },
+        },
+        {
+            entry: { vscode: "src/vscode/index.ts" },
+            format: "cjs",
+            clean: false,
+            deps: { neverBundle: ["vscode"] },
+        },
+    ],
     test: { clearMocks: true, include: ["spec/**/*.spec.ts", "cts/*.spec.ts"] },
     fmt: { arrowParens: "avoid" },
     lint: {
