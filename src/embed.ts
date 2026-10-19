@@ -4,10 +4,7 @@ export interface Template {
     readonly start: number;
     /** Offset of the closing backtick in the host source, or the source length when missing. */
     readonly end: number;
-    /**
-     * The WGSL text: the content with each `${}` substitution replaced by a placeholder
-     * identifier of the same length, so that the offsets in the text and the content match.
-     */
+    /** The WGSL text: the content with the substitutions and escapes replaced at the same length. */
     readonly text: string;
     /** Start and end offsets of the placeholders in the text, in pairs. */
     readonly placeholders: readonly number[];
@@ -131,10 +128,10 @@ class Scanner {
             for (let p = 0; p < placeholders.length; p += 2) {
                 const from = placeholders[p]! + start;
                 const to = placeholders[p + 1]! + start;
-                text += source.slice(at, from) + placeholder(to - from);
+                text += cooked(source.slice(at, from)) + placeholder(to - from);
                 at = to;
             }
-            text += source.slice(at, end);
+            text += cooked(source.slice(at, end));
             this.templates.push({ start, end, text, placeholders });
         }
         return end + 1;
@@ -153,6 +150,33 @@ class Scanner {
         while (i >= 0 && /[\w$]/.test(source[i]!)) i--;
         return this.tags.has(source.slice(i + 1, end));
     }
+}
+
+const escapes: Readonly<Record<string, string>> = {
+    n: "\n",
+    r: "\r",
+    t: "\t",
+    b: "\b",
+    f: "\f",
+    v: "\v",
+    "0": "\0",
+    "\n": "",
+    "\r": "",
+    "\r\n": "",
+    " ": "",
+    " ": "",
+};
+
+/** Replaces the escape sequences of the template literal content as the cooked string does. */
+function cooked(raw: string): string {
+    return raw.replace(
+        /\\(u\{[\da-fA-F]+\}|u[\da-fA-F]{4}|x[\da-fA-F]{2}|\r\n|[\s\S])/g,
+        (escape, code: string) => {
+            const hex = /^[ux]\{?([\da-fA-F]+)/.exec(code)?.[1];
+            const value = hex ? String.fromCodePoint(parseInt(hex, 16)) : (escapes[code] ?? code);
+            return value.padStart(escape.length, " ");
+        },
+    );
 }
 
 /** Returns a WGSL identifier of the length standing for a substitution. */

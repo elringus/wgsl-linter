@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vite-plus/test";
 import { extractTemplates } from "../src/embed.ts";
+import { lint } from "../src/index.ts";
 
 describe("template extraction", () => {
     it("extracts the tagged templates with the substitutions as same-length placeholders", () => {
@@ -10,6 +11,21 @@ describe("template extraction", () => {
         expect(template?.text.length).toBe(source.slice(template!.start, template!.end).length);
         expect(template?.placeholders).toEqual([10, 18]);
         expect(source.slice(template!.start + 10, template!.start + 18)).toBe("${count}");
+    });
+
+    it("replaces the escape sequences by the characters they stand for, keeping the length", () => {
+        const source = "wgsl`fn f() {}\\n\\t\\u0041\\u{42}\\x43\\`\\\\\\\n`";
+        const [template] = extractTemplates(source, ["wgsl"]);
+        expect(template?.text).toBe("fn f() {} \n \t     A     B   C ` \\  ");
+        expect(template?.text.length).toBe(template!.end - template!.start);
+    });
+
+    it("lints the code after the escaped line breaks", () => {
+        const source = "wgsl`// helpers\\nfn one() -> u32 { return -1; }\\n`";
+        const [template] = extractTemplates(source, ["wgsl"]);
+        expect(lint(template!.text).map(d => d.message)).toEqual([
+            "value -1 cannot be represented as 'u32'",
+        ]);
     });
 
     it("recognizes the tags of the comments before the templates", () => {
