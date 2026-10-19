@@ -43,7 +43,7 @@ const enumAttributes = new Set(["builtin", "interpolate"]);
  * {@link TokenType} and {@link TokenModifier} bits, sorted by offset.
  */
 export function semanticTokens(doc: Document): number[] {
-    const { tree, base } = doc;
+    const { tree } = doc;
     const sem = doc.semantics;
     const { refs } = doc.resolution;
     const { starts, ends } = tree.tokens;
@@ -52,7 +52,7 @@ export function semanticTokens(doc: Document): number[] {
     for (let node = 1; node < tree.count; node++) {
         const token = tree.tokenOf[node]!;
         const start = starts[token]!;
-        if (start < base) continue;
+        if (doc.inPrelude(start, ends[token]!)) continue;
         let type: TokenType | undefined;
         let modifiers = TokenModifier.None;
         switch (tree.kinds[node]) {

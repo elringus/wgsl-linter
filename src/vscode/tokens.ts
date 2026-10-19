@@ -8,10 +8,10 @@ export function provideSemanticTokens(
     legend: vscode.SemanticTokensLegend,
 ): vscode.SemanticTokens {
     const builder = new vscode.SemanticTokensBuilder(legend);
-    const [region] = regions.of(document);
-    const data = semanticTokens(region!.doc);
+    const { doc, start } = regions.of(document)[0]!;
+    const data = semanticTokens(doc);
     for (let i = 0; i < data.length; i += 4) {
-        const position = document.positionAt(data[i]! + region!.shift);
+        const position = document.positionAt(doc.textOffset(data[i]!) + start);
         builder.push(position.line, position.character, data[i + 1]!, data[i + 2]!, data[i + 3]!);
     }
     return builder.build();

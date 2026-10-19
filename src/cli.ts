@@ -4,7 +4,6 @@ import { extname, join } from "node:path";
 import { extractTemplates } from "./embed.ts";
 import { lineStarts, position } from "./lines.ts";
 import { Document } from "./service/document.ts";
-import type { Diagnostic } from "./syntax/diagnostic.ts";
 
 const usage = `usage: wgsl-lint [options] <file or directory>...
 
@@ -13,7 +12,7 @@ directories are searched for the .wgsl files and, with --tag, the JS/TS files.
 
 options:
   --tag <name>      tag of the JS/TS template literals holding WGSL, as in wgsl\`...\`; repeatable
-  --prelude <file>  WGSL declarations available to all the shaders
+  --prelude <file>  WGSL code spliced after the directives of all the shaders
   --help            show this message`;
 
 const scripts = new Set([".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx", ".mts", ".cts"]);
@@ -48,12 +47,14 @@ function main(args: readonly string[]): number {
             const [line, column] = position(lines, offset);
             console.log(`${file}:${line + 1}:${column + 1}: ${kind}: ${message}`);
         };
-        for (const [diagnostics, shift] of analyze(file, text, tags, prelude))
-            for (const d of diagnostics) {
+        for (const [doc, shift] of shaders(file, text, tags, prelude))
+            for (const d of doc.diagnostics()) {
                 if (d.severity === "error") errors++;
                 else if (d.severity === "warning") warnings++;
-                report(d.start + shift, d.severity, d.message);
-                for (const note of d.notes ?? []) report(note.start + shift, "note", note.message);
+                report(doc.textOffset(d.start) + shift, d.severity, d.message);
+                for (const note of d.notes ?? [])
+                    if (!doc.inPrelude(note.start, note.end))
+                        report(doc.textOffset(note.start) + shift, "note", note.message);
             }
     }
     if (errors + warnings > 0) console.log(`${errors} error(s), ${warnings} warning(s)`);
@@ -65,21 +66,18 @@ function fail(message: string): number {
     return 2;
 }
 
-/** Returns the diagnostics of the file's shaders with the shifts of their offsets in the file. */
-function analyze(
+/** Returns the documents of the file's shaders with the offsets of their texts in the file. */
+function shaders(
     file: string,
     text: string,
     tags: readonly string[],
     prelude: string | undefined,
-): [Diagnostic[], number][] {
-    if (!scripts.has(extname(file))) {
-        const doc = new Document(text, { prelude });
-        return [[doc.diagnostics(), -doc.base]];
-    }
-    return extractTemplates(text, tags.length > 0 ? tags : ["wgsl"]).map(template => {
-        const doc = new Document(template.text, { prelude });
-        return [doc.diagnostics(), template.start - doc.base];
-    });
+): [Document, number][] {
+    if (!scripts.has(extname(file))) return [[new Document(text, { prelude }), 0]];
+    return extractTemplates(text, tags.length > 0 ? tags : ["wgsl"]).map(template => [
+        new Document(template.text, { prelude }),
+        template.start,
+    ]);
 }
 
 /** Expands the directories to the WGSL files and, when searching templates, the JS/TS files. */

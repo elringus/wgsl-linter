@@ -209,6 +209,36 @@ describe("navigation", () => {
         expect(isValidName("fn")).toBe(false);
         expect(isValidName("__x")).toBe(false);
     });
+
+    it("doesn't rename the declarations of the prelude", () => {
+        const preluded = new Document("fn f() -> f32 { return g(); }", {
+            prelude: "fn g() -> f32 { return 1.0; }",
+        });
+        const offset = preluded.sourceOffset(preluded.text.indexOf("g("));
+        expect(prepareRename(preluded, offset)).toBeUndefined();
+        expect(rename(preluded, offset)).toBeUndefined();
+    });
+});
+
+describe("prelude", () => {
+    it("reports the symbols, folding, tokens and hints of the text only", () => {
+        const text = "enable f16;\nconst a = 1;\n";
+        const plain = new Document(text);
+        const preluded = new Document(text, {
+            prelude: "// Shared\n// lines.\nstruct P {\n    x: f32,\n}\nconst b = 2;",
+        });
+        const offset = (doc: Document) => (value: number, i: number) =>
+            i % 4 === 0 ? doc.textOffset(value) : value;
+        expect(documentSymbols(preluded).map(s => s.name)).toEqual(["a"]);
+        expect(foldingRanges(preluded)).toEqual([]);
+        expect(semanticTokens(preluded).map(offset(preluded))).toEqual(semanticTokens(plain));
+        expect(
+            inlayHints(preluded, 0, preluded.source.length).map(hint => ({
+                ...hint,
+                offset: preluded.textOffset(hint.offset),
+            })),
+        ).toEqual(inlayHints(plain, 0, text.length));
+    });
 });
 
 describe("completion", () => {

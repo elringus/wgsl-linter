@@ -12,8 +12,10 @@ export function provideInlayHints(
     const hints: vscode.InlayHint[] = [];
     for (const region of regions.of(document)) {
         if (region.end < start || region.start > end) continue;
-        for (const hint of inlayHints(region.doc, start - region.shift, end - region.shift)) {
-            const position = document.positionAt(hint.offset + region.shift);
+        const { doc } = region;
+        const from = doc.sourceOffset(start - region.start);
+        for (const hint of inlayHints(doc, from, doc.sourceOffset(end - region.start))) {
+            const position = document.positionAt(doc.textOffset(hint.offset) + region.start);
             hints.push(new vscode.InlayHint(position, hint.label, vscode.InlayHintKind.Type));
         }
     }

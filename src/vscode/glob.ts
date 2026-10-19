@@ -1,6 +1,6 @@
 const compiled = new Map<string, RegExp>();
 
-/** Whether the path matches the glob of the `**`, `*`, `?` and `{a,b}` wildcards. */
+/** Whether the path matches the glob of the `**`, `*`, `?`, `[a-z]`, `[!a-z]` and `{a,b}` wildcards. */
 export function matches(glob: string, path: string): boolean {
     let regex = compiled.get(glob);
     if (!regex) compiled.set(glob, (regex = compile(glob)));
@@ -18,7 +18,17 @@ function compile(glob: string): RegExp {
             i += slash ? 2 : 1;
         } else if (char === "*") source += "[^/]*";
         else if (char === "?") source += "[^/]";
-        else if (char === "{") {
+        else if (char === "[") {
+            const negated = glob[i + 1] === "!" || glob[i + 1] === "^";
+            const from = i + (negated ? 2 : 1);
+            const close = glob.indexOf("]", from + 1);
+            if (close < 0) source += "\\[";
+            else {
+                const set = glob.slice(from, close).replace(/[\\\]]/g, "\\$&");
+                source += negated ? `(?!/)[^${set}]` : `[${set}]`;
+                i = close;
+            }
+        } else if (char === "{") {
             braces++;
             source += "(?:";
         } else if (char === "}" && braces > 0) {

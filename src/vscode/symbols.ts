@@ -34,9 +34,9 @@ export function provideFoldingRanges(
     const ranges: vscode.FoldingRange[] = [];
     for (const region of regions.of(document))
         for (const range of foldingRanges(region.doc)) {
-            const start = document.positionAt(range.start + region.shift).line;
-            const end =
-                document.positionAt(range.end + region.shift).line - (range.comment ? 0 : 1);
+            const at = regions.range(document, region, range)!;
+            const start = at.start.line;
+            const end = at.end.line - (range.comment ? 0 : 1);
             if (end > start)
                 ranges.push(
                     new vscode.FoldingRange(

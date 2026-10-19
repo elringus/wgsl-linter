@@ -34,9 +34,9 @@ const shader = wgsl`
 
 Templates are formatted with the "Format WGSL template" code action.
 
-To declare the structs and functions shared across the shaders, list the `.wgsl` files with them in the `wgsl.prelude` setting, as globs relative to the workspace folder.
+For an engine composing shared structs and functions into its shaders, list the `.wgsl` files with them in the `wgsl.prelude` setting; their code is spliced after the directives of each shader.
 
-All the `.wgsl` files of the workspace are validated, open or not, and the templates in the open JS/TS files. The `wgsl.validate` setting maps globs relative to the workspace folder to the validation levels: `full`, `partial` to skip the names declared elsewhere, as in the parts of larger shaders, or `off`. The JS/TS files matched by a glob other than `off` are validated even when closed:
+The `wgsl.validate` setting maps path globs to the validation levels. `partial` skips the names declared elsewhere, `off` disables the analyzer completely. The JS/TS files matched by a glob other than `off` are validated even when closed:
 
 ```json
 "wgsl.validate": { "src/**/*.ts": "full", "shaders/chunks/**": "partial", "vendor/**": "off" }
@@ -69,12 +69,12 @@ Positions are UTF-16 offsets.
 import { register } from "wgsl-linter/vscode";
 
 export function activate(context: vscode.ExtensionContext) {
-    register(context, { tags: ["wgsl", "shader"], prelude: engineDeclarations });
+    register(context, { tags: ["wgsl", "shader"], prelude: engineCode });
 }
 ```
 
 - `tags`: tags of the template literals holding WGSL; `wgsl` by default.
-- `prelude`: WGSL declarations available to all the shaders, such as engine-provided structs.
+- `prelude`: WGSL code the engine composes into all the shaders, spliced after their directives.
 - `validate`: the validation levels by glob, as in the `wgsl.validate` setting.
 - `extensions`, `features`: the enable-extensions and language features the target supports; Chrome's by default.
 

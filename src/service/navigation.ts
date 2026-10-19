@@ -102,7 +102,7 @@ export function occurrences(doc: Document, decl: number, includeDeclaration: boo
 /** Returns the range of the name at the offset when it names a declaration of the text. */
 export function prepareRename(doc: Document, offset: number): Range | undefined {
     const target = targetAt(doc, offset);
-    if (!target?.decl || doc.tree.starts[target.decl]! < doc.base) return undefined;
+    if (!target?.decl || isPrelude(doc, target.decl)) return undefined;
     const [start, end] = tokenRange(doc.tree, target.node);
     return { start, end };
 }
@@ -110,8 +110,13 @@ export function prepareRename(doc: Document, offset: number): Range | undefined 
 /** Returns the ranges to replace with the new name to rename the declaration named at the offset. */
 export function rename(doc: Document, offset: number): Range[] | undefined {
     const target = targetAt(doc, offset);
-    if (!target?.decl || doc.tree.starts[target.decl]! < doc.base) return undefined;
+    if (!target?.decl || isPrelude(doc, target.decl)) return undefined;
     return occurrences(doc, target.decl, true);
+}
+
+/** Whether the declaration is in the document's prelude. */
+function isPrelude(doc: Document, decl: number): boolean {
+    return doc.inPrelude(doc.tree.starts[decl]!, doc.tree.ends[decl]!);
 }
 
 /** Whether the text is a valid name of a user declaration. */

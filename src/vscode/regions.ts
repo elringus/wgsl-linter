@@ -10,8 +10,8 @@ export interface Options extends AnalyzerOptions {
     /** Tags of the JS/TS template literals holding WGSL, as in wgsl`...`; `wgsl` by default. */
     readonly tags?: readonly string[];
     /**
-     * WGSL declarations available to all the shaders, such as the structs and functions an
-     * engine provides; analyzed as if prepended to each shader.
+     * WGSL code an engine composes into all the shaders, such as the shared structs and
+     * functions; spliced after the shaders' directives.
      */
     readonly prelude?: string;
     /**
@@ -36,11 +36,10 @@ const leniency = { full: 0, partial: 1, off: 2 };
 
 /**
  * A WGSL source within a VS Code document: a whole `.wgsl` document or a template literal;
- * the offsets of the document in the host are the analyzed offsets plus the shift.
+ * the offsets of the document's text in the host are the text offsets plus the start.
  */
 export interface Region {
     readonly doc: Document;
-    readonly shift: number;
     /** Range of the region in the host document. */
     readonly start: number;
     readonly end: number;
@@ -77,32 +76,31 @@ export class Regions {
         const validate = this.levelOf(uri, folder);
         if (wgsl) {
             const doc = new Document(text, { prelude, extensions, features, validate });
-            return [{ doc, shift: -doc.base, start: 0, end: text.length }];
+            return [{ doc, start: 0, end: text.length }];
         }
         return extractTemplates(text, options.tags ?? ["wgsl"]).map(template => {
             const doc = new Document(template.text, { prelude, extensions, features, validate });
-            const shift = template.start - doc.base;
-            return { doc, shift, start: template.start, end: template.end, template };
+            return { doc, start: template.start, end: template.end, template };
         });
     }
 
-    /** Returns the region at the position and the analyzed offset of the position. */
+    /** Returns the region at the position and the source offset of the position. */
     at(document: vscode.TextDocument, position: vscode.Position): [Region, number] | undefined {
         const offset = document.offsetAt(position);
         const region = this.of(document).find(r => r.start <= offset && offset <= r.end);
-        return region && [region, offset - region.shift];
+        return region && [region, region.doc.sourceOffset(offset - region.start)];
     }
 
-    /** Converts the analyzed range to the host document's range, unless it's in the prelude. */
+    /** Converts the source range to the host document's range, unless it's in the prelude. */
     range(
         document: Pick<vscode.TextDocument, "positionAt">,
-        region: Region,
+        { doc, start }: Region,
         range: Range,
     ): vscode.Range | undefined {
-        if (range.start < region.doc.base) return undefined;
+        if (doc.inPrelude(range.start, range.end)) return undefined;
         return new vscode.Range(
-            document.positionAt(range.start + region.shift),
-            document.positionAt(range.end + region.shift),
+            document.positionAt(doc.textOffset(range.start) + start),
+            document.positionAt(doc.textOffset(range.end) + start),
         );
     }
 
@@ -158,11 +156,16 @@ export class Regions {
         };
         const isPrelude = (uri: vscode.Uri): boolean =>
             [...this.preludes.values()].some(files => files.has(uri.toString()));
+        const hasPrelude = (uri: vscode.Uri): boolean => {
+            const folder = workspace.getWorkspaceFolder(uri);
+            const globs = workspace.getConfiguration("wgsl", folder).get<string[]>("prelude", []);
+            return !!folder && globs.length > 0;
+        };
         const watcher = workspace.createFileSystemWatcher("**/*.wgsl");
         return [
             watcher,
-            watcher.onDidCreate(reload),
-            watcher.onDidDelete(reload),
+            watcher.onDidCreate(uri => hasPrelude(uri) && reload()),
+            watcher.onDidDelete(uri => isPrelude(uri) && reload()),
             watcher.onDidChange(uri => isPrelude(uri) && reload()),
             workspace.onDidChangeWorkspaceFolders(reload),
             workspace.onDidChangeConfiguration(

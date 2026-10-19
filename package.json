@@ -1,7 +1,7 @@
 {
     "name": "wgsl-linter",
     "displayName": "WGSL Linter",
-    "version": "0.4.1",
+    "version": "0.5.0",
     "description": "WGSL language support: semantic highlighting, diagnostics, completion, hover, navigation, rename and formatting.",
     "categories": [
         "Formatters",
@@ -63,7 +63,7 @@
                     },
                     "default": [],
                     "scope": "resource",
-                    "markdownDescription": "Glob patterns of the `.wgsl` files, relative to the workspace folder, whose declarations are available to all the shaders of the folder, such as the structs and functions shared across a pipeline."
+                    "markdownDescription": "Glob patterns of the `.wgsl` files, relative to the workspace folder, whose code is spliced after the directives of all the shaders in the workspace."
                 },
                 "wgsl.validate": {
                     "type": "object",

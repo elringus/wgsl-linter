@@ -259,7 +259,8 @@ function grow<T extends Uint8Array | Uint32Array>(from: T, to: T): T {
     return to;
 }
 
-function skipTrivia(
+/** Returns the offset after the blankspace and comments at the offset, collecting the comments. */
+export function skipTrivia(
     text: string,
     pos: number,
     comments: number[],

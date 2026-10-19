@@ -28,13 +28,13 @@ export interface DocumentSymbol {
 
 /** Returns the module-scope declarations of the text and the members of its structures. */
 export function documentSymbols(doc: Document): DocumentSymbol[] {
-    const { tree, base } = doc;
+    const { tree } = doc;
     const symbols: DocumentSymbol[] = [];
-    for (let node = tree.firsts[0]!; node; node = tree.nexts[node]!)
-        if (tree.starts[node]! >= base) {
-            const symbol = declarationSymbol(doc, node);
-            if (symbol) symbols.push(symbol);
-        }
+    for (let node = tree.firsts[0]!; node; node = tree.nexts[node]!) {
+        if (doc.inPrelude(tree.starts[node]!, tree.ends[node]!)) continue;
+        const symbol = declarationSymbol(doc, node);
+        if (symbol) symbols.push(symbol);
+    }
     return symbols;
 }
 
@@ -94,7 +94,7 @@ export interface FoldingRange extends Range {
  * structures, and the comments spanning multiple lines.
  */
 export function foldingRanges(doc: Document): FoldingRange[] {
-    const { tree, base } = doc;
+    const { tree } = doc;
     const { tokens } = tree;
     const ranges: FoldingRange[] = [];
     const stack: number[] = [];
@@ -105,7 +105,7 @@ export function foldingRanges(doc: Document): FoldingRange[] {
             const open = stack.pop()!;
             const start = tokens.starts[open]!;
             const end = tokens.starts[i]!;
-            if (start >= base && hasLineBreak(tree, start, end))
+            if (hasLineBreak(tree, start, end) && !doc.inPrelude(start, end))
                 ranges.push({ start, end, comment: false });
         }
     }
@@ -113,13 +113,13 @@ export function foldingRanges(doc: Document): FoldingRange[] {
     for (let i = 0; i < comments.length; i += 2) {
         const start = comments[i]!;
         let end = comments[i + 1]!;
-        if (start < base) continue;
         if (tree.text.startsWith("//", start))
             while (i + 2 < comments.length && isNextLineComment(tree, end, comments[i + 2]!)) {
                 i += 2;
                 end = comments[i + 1]!;
             }
-        if (hasLineBreak(tree, start, end)) ranges.push({ start, end, comment: true });
+        if (hasLineBreak(tree, start, end) && !doc.inPrelude(start, end))
+            ranges.push({ start, end, comment: true });
     }
     return ranges.sort((a, b) => a.start - b.start);
 }

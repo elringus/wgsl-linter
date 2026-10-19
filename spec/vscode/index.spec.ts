@@ -251,7 +251,7 @@ const script = document(
     "typescript",
 );
 vscode.workspace.textDocuments.push(wgsl, script);
-register({ subscriptions: [] } as never, { prelude: "struct Common { a: f32 }" });
+register({ subscriptions: [] } as never);
 
 const call = (provider: string, method: string, ...args: unknown[]) =>
     vscode.providers.get(provider)![method]!(...args) as never;
@@ -388,12 +388,12 @@ describe("vscode adapter", () => {
         expect(format(["shader"])).toHaveLength(1);
     });
 
-    it("declares the prelude files of the folder settings to the folder's shaders", async () => {
+    it("splices the prelude files of the folder settings after the directives of its shaders", async () => {
         vscode.workspace.workspaceFolders.push({ uri: { toString: () => "file:///folder/" } });
         vscode.settings.prelude = ["shaders/*"];
         vscode.files.set("/folder/shaders/common.wgsl", "struct Params { color: vec3f }");
         vscode.files.set("/folder/shaders/notes.txt", "not a shader");
-        const user = "var<private> p: Params;\n";
+        const user = "enable f16;\nvar<private> p: Params;\nconst x: u32 = -1;\n";
         vscode.workspace.textDocuments.push(
             document(user, "wgsl", "file:///folder/user.wgsl"),
             document(
@@ -404,9 +404,13 @@ describe("vscode adapter", () => {
             document(user, "wgsl", "file:///other/user.wgsl"),
         );
         await activate({ subscriptions: [] } as never);
-        expect(vscode.diagnostics.get("file:///folder/user.wgsl")).toEqual([]);
+        const [error, ...rest] = vscode.diagnostics.get("file:///folder/user.wgsl") as {
+            args: [{ start: unknown }];
+        }[];
+        expect(rest).toEqual([]);
+        expect(error!.args[0].start).toEqual(new vscode.Position(2, 15));
         expect(vscode.diagnostics.get("file:///folder/shaders/common.wgsl")).toEqual([]);
-        expect(vscode.diagnostics.get("file:///other/user.wgsl")).toHaveLength(1);
+        expect(vscode.diagnostics.get("file:///other/user.wgsl")).toHaveLength(2);
     });
 
     it("lints the wgsl files of the workspace from disk, skipping the dependencies", async () => {
@@ -438,7 +442,7 @@ describe("vscode adapter", () => {
         await activate({ subscriptions: [] } as never);
         await vi.waitFor(() => expect(vscode.diagnostics.has("file:///folder/app.ts")).toBe(false));
         expect(vscode.diagnostics.has("file:///folder/lib/broken.wgsl")).toBe(false);
-        expect(vscode.diagnostics.get("file:///folder/user.wgsl")).toEqual([]);
+        expect(vscode.diagnostics.get("file:///folder/user.wgsl")).toHaveLength(1);
     });
 
     it("applies the validation level of the most specific glob matching the file", async () => {

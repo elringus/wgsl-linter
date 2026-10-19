@@ -19,6 +19,7 @@ export function inlayHints(doc: Document, start: number, end: number): InlayHint
             continue;
         const name = childOf(tree, node, Node.Name);
         if (!name || tree.ends[name]! < start || tree.ends[name]! > end) continue;
+        if (doc.inPrelude(tree.starts[name]!, tree.ends[name]!)) continue;
         if (childOf(tree, node, Node.Type) || !initializerOf(tree, node)) continue;
         const type = types[node];
         if (!type || type.kind === Kind.Error) continue;
