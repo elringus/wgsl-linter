@@ -1,0 +1,6 @@
+**
+!dist/vscode.js
+!syntaxes/*.json
+!assets/logo.png
+!assets/file-*.svg
+!LICENSE.md

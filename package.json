@@ -29,14 +29,6 @@
     "bin": {
         "wgsl-lint": "dist/cli.js"
     },
-    "files": [
-        "dist/*.js",
-        "dist/*.d.ts",
-        "syntaxes/*.json",
-        "assets/logo.png",
-        "assets/file-*.svg",
-        "LICENSE.md"
-    ],
     "type": "module",
     "main": "./dist/vscode.js",
     "exports": {
