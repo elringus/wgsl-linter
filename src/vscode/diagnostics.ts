@@ -1,17 +1,9 @@
 import * as vscode from "vscode";
 import { lineStarts, position } from "../lines.ts";
 import type { Severity } from "../syntax/diagnostic.ts";
-import { all, type Options, type Region, type Regions } from "./regions.ts";
+import { all, type Region, type Regions } from "./regions.ts";
 
-type Scope = (folder: vscode.WorkspaceFolder) => Options["lint"];
-
-/** Extensions of the workspace files to lint by the lint option. */
-const extensions: Record<NonNullable<Options["lint"]>, readonly string[]> = {
-    open: [],
-    files: ["wgsl"],
-    all: ["wgsl", "js", "jsx", "mjs", "cjs", "ts", "tsx", "mts", "cts"],
-};
-
+const scripts = new Set(["js", "jsx", "mjs", "cjs", "ts", "tsx", "mts", "cts"]);
 const decoder = new TextDecoder();
 
 /** Publishes the diagnostics of the WGSL documents and templates. */
@@ -20,17 +12,14 @@ export class Diagnostics implements vscode.Disposable {
     /** Number of the latest workspace scan, stopping the previous ones. */
     private scan = 0;
 
-    constructor(
-        private readonly regions: Regions,
-        private readonly scope: Scope,
-    ) {}
+    constructor(private readonly regions: Regions) {}
 
     lint(document: vscode.TextDocument): void {
         if (vscode.languages.match(all, document) === 0) return;
         this.publish(document.uri, document, this.regions.of(document));
     }
 
-    /** Lints the open documents and the workspace files, clearing the diagnostics out of the scope. */
+    /** Lints the open documents and the closed files in the scope, clearing the others. */
     async lintAll(): Promise<void> {
         const scan = ++this.scan;
         const stale = new Map<string, vscode.Uri>();
@@ -40,12 +29,22 @@ export class Diagnostics implements vscode.Disposable {
             this.lint(document);
         }
         for (const folder of vscode.workspace.workspaceFolders ?? []) {
-            const types = this.extensionsOf(folder);
-            if (types.length === 0) continue;
-            const glob = new vscode.RelativePattern(folder, `**/*.{${types.join(",")}}`);
-            for (const uri of await vscode.workspace.findFiles(glob, "**/node_modules/**")) {
+            const levels = Object.entries(this.regions.optionsOf(folder).validate ?? {});
+            const globs = [
+                "**/*.wgsl",
+                ...levels.flatMap(([glob, l]) => (l === "off" ? [] : glob)),
+            ];
+            const files = new Map<string, vscode.Uri>();
+            for (const glob of globs)
+                for (const uri of await vscode.workspace.findFiles(
+                    new vscode.RelativePattern(folder, glob),
+                    "**/node_modules/**",
+                ))
+                    files.set(uri.toString(), uri);
+            for (const [key, uri] of files) {
                 if (scan !== this.scan) return;
-                stale.delete(uri.toString());
+                if (!this.inScope(uri)) continue;
+                stale.delete(key);
                 await this.lintFile(uri);
             }
         }
@@ -55,7 +54,7 @@ export class Diagnostics implements vscode.Disposable {
     /** Lints the files in the scope on their changes on disk. */
     watch(): vscode.Disposable[] {
         const watcher = vscode.workspace.createFileSystemWatcher(
-            `**/*.{${extensions.all.join(",")}}`,
+            `**/*.{wgsl,${[...scripts].join(",")}}`,
         );
         const changed = (uri: vscode.Uri): void => {
             if (this.inScope(uri)) void this.lintFile(uri);
@@ -142,18 +141,16 @@ export class Diagnostics implements vscode.Disposable {
         });
     }
 
+    /** Whether the closed file is validated: a `.wgsl` file or a JS/TS file of a glob, unless `off`. */
     private inScope(uri: vscode.Uri): boolean {
-        const folder = vscode.workspace.getWorkspaceFolder(uri);
         const { path } = uri;
-        return (
-            folder !== undefined &&
-            !path.includes("/node_modules/") &&
-            this.extensionsOf(folder).includes(path.slice(path.lastIndexOf(".") + 1))
-        );
-    }
-
-    private extensionsOf(folder: vscode.WorkspaceFolder): readonly string[] {
-        return extensions[this.scope(folder) ?? "files"];
+        const extension = path.slice(path.lastIndexOf(".") + 1);
+        const wgsl = extension === "wgsl";
+        if (path.includes("/node_modules/") || (!wgsl && !scripts.has(extension))) return false;
+        const folder = vscode.workspace.getWorkspaceFolder(uri);
+        if (!folder) return false;
+        const level = this.regions.levelOf(uri, folder);
+        return level === undefined ? wgsl : level !== "off";
     }
 }
 

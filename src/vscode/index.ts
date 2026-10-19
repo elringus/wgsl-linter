@@ -9,18 +9,14 @@ export { register } from "./register.ts";
 
 /** Activates the extension with the workspace settings. */
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
-    const { workspace } = vscode;
-    const regions = new Regions({});
+    const regions = new Regions(folder => ({
+        validate: vscode.workspace.getConfiguration("wgsl", folder).get("validate"),
+    }));
     await regions.loadPreludes();
-    const diagnostics = new Diagnostics(regions, folder =>
-        workspace.getConfiguration("wgsl", folder).get("lint"),
-    );
+    const diagnostics = new Diagnostics(regions);
     const disposables = [
         ...features(regions, diagnostics),
-        ...regions.watchPreludes(() => diagnostics.lintAll()),
-        workspace.onDidChangeConfiguration(
-            event => event.affectsConfiguration("wgsl.lint") && diagnostics.lintAll(),
-        ),
+        ...regions.watchSettings(() => diagnostics.lintAll()),
     ];
     context.subscriptions.push(vscode.Disposable.from(...disposables));
 }

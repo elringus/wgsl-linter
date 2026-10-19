@@ -186,6 +186,10 @@ const vscode = vi.hoisted(() => {
                     target.toString().startsWith(f.uri.toString()),
                 );
             },
+            asRelativePath(target: { toString(): string }) {
+                const folder = this.getWorkspaceFolder(target);
+                return target.toString().slice(folder?.uri.toString().length);
+            },
             findFiles: async (
                 { base, pattern }: { base: { uri: { toString(): string } }; pattern: string },
                 exclude?: string,
@@ -431,19 +435,49 @@ describe("vscode adapter", () => {
         expect(vscode.diagnostics.has("file:///folder/app.ts")).toBe(false);
     });
 
-    it("lints the templates of the workspace's JS/TS files when set to all", async () => {
-        vscode.settings.lint = "all";
+    it("lints the templates of the closed JS/TS files matched by a validate glob", async () => {
+        vscode.settings.validate = { "*.ts": "full" };
         await activate({ subscriptions: [] } as never);
         await vi.waitFor(() =>
             expect(vscode.diagnostics.get("file:///folder/app.ts")).toHaveLength(1),
         );
     });
 
-    it("clears the diagnostics of the files out of the scope when set to open", async () => {
-        vscode.settings.lint = "open";
+    it("clears the diagnostics of the closed files out of the scope", async () => {
+        vscode.settings.validate = { "lib/**": "off" };
         await activate({ subscriptions: [] } as never);
-        expect(vscode.diagnostics.has("file:///folder/app.ts")).toBe(false);
+        await vi.waitFor(() => expect(vscode.diagnostics.has("file:///folder/app.ts")).toBe(false));
         expect(vscode.diagnostics.has("file:///folder/lib/broken.wgsl")).toBe(false);
         expect(vscode.diagnostics.get("file:///folder/user.wgsl")).toEqual([]);
+    });
+
+    it("applies the validation level of the most specific glob matching the file", async () => {
+        vscode.settings.validate = { "**": "off", "lib/*.wgsl": "partial" };
+        vscode.files.set("/folder/main.wgsl", "var<private> m: Missing;\n");
+        vscode.files.set(
+            "/folder/lib/negative.wgsl",
+            "var<private> m: Missing;\nconst c: u32 = -1;\n",
+        );
+        await activate({ subscriptions: [] } as never);
+        await vi.waitFor(() =>
+            expect(vscode.diagnostics.get("file:///folder/lib/negative.wgsl")).toHaveLength(1),
+        );
+        expect(vscode.diagnostics.get("file:///folder/lib/broken.wgsl")).toEqual([]);
+        expect(vscode.diagnostics.has("file:///folder/main.wgsl")).toBe(false);
+    });
+
+    it("ranks the globs by their characters besides the wildcards, then by the least reported", async () => {
+        const { Regions } = await import("../../src/vscode/regions.ts");
+        const file = { toString: () => "file:///folder/src/core/noise.js" };
+        const levelOf = (validate: Record<string, "full" | "partial" | "off">) =>
+            new Regions(() => ({ validate })).levelOf(
+                file as never,
+                vscode.workspace.workspaceFolders[0] as never,
+            );
+        expect(levelOf({ "src/**/*.js": "full", "src/core/**": "partial" })).toBe("partial");
+        expect(levelOf({ "src/core/**": "partial", "src/**/*.js": "full" })).toBe("partial");
+        expect(levelOf({ "src/core/**": "full", "**/noise.js": "off" })).toBe("off");
+        expect(levelOf({ "**/noise.js": "off", "src/core/**": "full" })).toBe("off");
+        expect(levelOf({ "lib/**": "off" })).toBeUndefined();
     });
 });

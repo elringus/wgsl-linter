@@ -44,6 +44,30 @@ describe("document", () => {
         expect(doc.uncheckedNames()).toEqual([]);
     });
 
+    it("skips the diagnostics of the names declared elsewhere in the partial documents", () => {
+        const text =
+            "var<private> l: Light;\nfn f() -> f32 { return l.color.x * scale(); }\nconst x: u32 = -1;";
+        const messages = (validate: "full" | "partial" | "off") =>
+            new Document(text, { validate }).diagnostics().map(d => d.message);
+        expect(messages("full")).toEqual([
+            "unresolved identifier 'Light'",
+            "unresolved identifier 'scale'",
+            "value -1 cannot be represented as 'u32'",
+        ]);
+        expect(messages("partial")).toEqual(["value -1 cannot be represented as 'u32'"]);
+        expect(messages("off")).toEqual([]);
+    });
+
+    it("takes the validation level from a leading comment over the option", () => {
+        const text = "var<private> l: Light;\nconst x: u32 = -1;";
+        const count = (head: string) =>
+            new Document(head + text, { validate: "full" }).diagnostics().length;
+        expect(count("// wgsl: partial\n")).toBe(1);
+        expect(count("// license\n\n/* wgsl: off */\n")).toBe(0);
+        expect(count("const c = 1;\n// wgsl: off\n")).toBe(2);
+        expect(count("// wgsl: unknown\n")).toBe(2);
+    });
+
     it("keeps the unresolved names when the placeholders are expressions", () => {
         const text = "var<private> l: Light = _p___;";
         const doc = new Document(text, { placeholders: [24, 29] });

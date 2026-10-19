@@ -17,6 +17,11 @@ export interface DocumentOptions extends Options {
      * standing for the substitutions of an embedding template.
      */
     readonly placeholders?: readonly number[];
+    /**
+     * Validation level, unless a leading `// wgsl: <level>` comment sets it: all the diagnostics
+     * (`full`, default), all but those of the names declared elsewhere (`partial`) or none (`off`).
+     */
+    readonly validate?: "full" | "partial" | "off";
 }
 
 /**
@@ -100,8 +105,10 @@ export class Document {
 
     /** Splits the diagnostics of the text into the certain ones and the unchecked names. */
     private triage(): { certain: Diagnostic[]; unchecked: string[] } {
+        const level = leadingLevel(this.source, this.base) ?? this.options.validate;
+        if (level === "off") return { certain: [], unchecked: [] };
         const { tree, resolution, semantics, base } = this;
-        const declaring = this.declaringPlaceholders().length > 0;
+        const declaring = level === "partial" || this.declaringPlaceholders().length > 0;
         const certain: Diagnostic[] = [];
         const unchecked = new Set<string>();
         for (const d of [
@@ -128,4 +135,15 @@ export class Document {
             this.semantics.sems[node] === Sem.Error
         );
     }
+}
+
+/** Returns the level of the `// wgsl: <level>` comment among the comments leading the offset. */
+function leadingLevel(source: string, offset: number): DocumentOptions["validate"] {
+    const comment = /\s*(?:\/\/([^\n]*)|\/\*([\s\S]*?)\*\/)/y;
+    comment.lastIndex = offset;
+    for (let match; (match = comment.exec(source));) {
+        const level = /^\s*wgsl:\s*(full|partial|off)\s*$/.exec(match[1] ?? match[2]!)?.[1];
+        if (level) return level as DocumentOptions["validate"];
+    }
+    return undefined;
 }

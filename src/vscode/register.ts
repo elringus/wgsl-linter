@@ -25,9 +25,8 @@ export function register(
     context: vscode.ExtensionContext,
     options: Options = {},
 ): vscode.Disposable {
-    const regions = new Regions(options);
-    const diagnostics = new Diagnostics(regions, () => options.lint);
-    const disposable = vscode.Disposable.from(...features(regions, diagnostics));
+    const regions = new Regions(() => options);
+    const disposable = vscode.Disposable.from(...features(regions, new Diagnostics(regions)));
     context.subscriptions.push(disposable);
     return disposable;
 }

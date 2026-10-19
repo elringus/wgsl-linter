@@ -1,7 +1,7 @@
 {
     "name": "wgsl-linter",
     "displayName": "WGSL Linter",
-    "version": "0.2.1",
+    "version": "0.3.0",
     "description": "WGSL language support: semantic highlighting, diagnostics, completion, hover, navigation, rename and formatting.",
     "categories": [
         "Formatters",
@@ -72,21 +72,24 @@
                     "scope": "resource",
                     "markdownDescription": "Glob patterns of the `.wgsl` files, relative to the workspace folder, whose declarations are available to all the shaders of the folder, such as the structs and functions shared across a pipeline."
                 },
-                "wgsl.lint": {
-                    "type": "string",
-                    "enum": [
-                        "open",
-                        "files",
-                        "all"
-                    ],
-                    "markdownEnumDescriptions": [
-                        "Only the open documents.",
-                        "Also the `.wgsl` files of the workspace folder.",
-                        "Also the `.wgsl` files and the templates in the JS/TS files of the workspace folder."
-                    ],
-                    "default": "files",
+                "wgsl.validate": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string",
+                        "enum": [
+                            "full",
+                            "partial",
+                            "off"
+                        ],
+                        "markdownEnumDescriptions": [
+                            "All the diagnostics.",
+                            "All but those of the names declared elsewhere, as in the parts of a larger shader.",
+                            "No diagnostics."
+                        ]
+                    },
+                    "default": {},
                     "scope": "resource",
-                    "markdownDescription": "Documents to lint, skipping the files under `node_modules`."
+                    "markdownDescription": "Validation levels of the files by glob patterns relative to the workspace folder: `full`, the default, `partial` to skip the names declared elsewhere, as in the parts of larger shaders, or `off`. The `.wgsl` files are validated even when closed, as are the JS/TS files matched by a pattern other than `off`; the files under `node_modules` only when open. A leading `// wgsl: <level>` comment in the shader overrides the level."
                 }
             }
         },
