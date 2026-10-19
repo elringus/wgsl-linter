@@ -57,6 +57,17 @@ const vscode = vi.hoisted(() => {
     const settings: Record<string, unknown> = {};
     const files = new Map<string, string>();
     const uri = (path: string) => ({ path, toString: () => `file://${path}` });
+    const glob = (pattern: string) =>
+        new RegExp(
+            `^${pattern
+                .replace(/[.+^$()|[\]\\]/g, "\\$&")
+                .replace(/\{(.*?)\}/g, (_, list: string) => `(${list.replaceAll(",", "|")})`)
+                .replaceAll("**/", "\0")
+                .replaceAll("**", "\x01")
+                .replaceAll("*", "[^/]*")
+                .replaceAll("\0", "(.*/)?")
+                .replaceAll("\x01", ".*")}$`,
+        );
     return {
         providers,
         diagnostics,
@@ -136,7 +147,11 @@ const vscode = vi.hoisted(() => {
             createDiagnosticCollection: () => ({
                 set: (uri: { toString(): string }, list: unknown[]) =>
                     diagnostics.set(uri.toString(), list),
-                delete: () => {},
+                has: (uri: { toString(): string }) => diagnostics.has(uri.toString()),
+                delete: (uri: { toString(): string }) => diagnostics.delete(uri.toString()),
+                forEach: (callback: (uri: { toString(): string }) => void) => {
+                    for (const key of diagnostics.keys()) callback({ toString: () => key });
+                },
                 dispose() {},
             }),
             match: (_: unknown, doc: { languageId: string }) =>
@@ -171,7 +186,22 @@ const vscode = vi.hoisted(() => {
                     target.toString().startsWith(f.uri.toString()),
                 );
             },
-            findFiles: async () => [...files.keys()].map(path => uri(path)),
+            findFiles: async (
+                { base, pattern }: { base: { uri: { toString(): string } }; pattern: string },
+                exclude?: string,
+            ) => {
+                const root = base.uri.toString().slice("file://".length);
+                return [...files.keys()]
+                    .filter(path => {
+                        const relative = path.slice(root.length);
+                        return (
+                            path.startsWith(root) &&
+                            glob(pattern).test(relative) &&
+                            !(exclude && glob(exclude).test(relative))
+                        );
+                    })
+                    .map(path => uri(path));
+            },
             fs: {
                 readFile: async (file: { path: string }) =>
                     new TextEncoder().encode(files.get(file.path)),
@@ -383,5 +413,37 @@ describe("vscode adapter", () => {
         expect(vscode.diagnostics.get("file:///folder/user.wgsl")).toEqual([]);
         expect(vscode.diagnostics.get("file:///folder/shaders/common.wgsl")).toEqual([]);
         expect(vscode.diagnostics.get("file:///other/user.wgsl")).toHaveLength(1);
+    });
+
+    it("lints the wgsl files of the workspace from disk, skipping the dependencies", async () => {
+        vscode.files.set("/folder/lib/broken.wgsl", "\nvar<private> b: Missing;\n");
+        vscode.files.set("/folder/node_modules/dep/broken.wgsl", "var<private> b: Missing;\n");
+        vscode.files.set("/folder/app.ts", "export const s = wgsl`var<private> b: Missing;`;\n");
+        await activate({ subscriptions: [] } as never);
+        await vi.waitFor(() =>
+            expect(vscode.diagnostics.has("file:///folder/lib/broken.wgsl")).toBe(true),
+        );
+        const [error] = vscode.diagnostics.get("file:///folder/lib/broken.wgsl") as {
+            args: [{ start: unknown }];
+        }[];
+        expect(error!.args[0].start).toEqual(new vscode.Position(1, 16));
+        expect(vscode.diagnostics.has("file:///folder/node_modules/dep/broken.wgsl")).toBe(false);
+        expect(vscode.diagnostics.has("file:///folder/app.ts")).toBe(false);
+    });
+
+    it("lints the templates of the workspace's JS/TS files when set to all", async () => {
+        vscode.settings.lint = "all";
+        await activate({ subscriptions: [] } as never);
+        await vi.waitFor(() =>
+            expect(vscode.diagnostics.get("file:///folder/app.ts")).toHaveLength(1),
+        );
+    });
+
+    it("clears the diagnostics of the files out of the scope when set to open", async () => {
+        vscode.settings.lint = "open";
+        await activate({ subscriptions: [] } as never);
+        expect(vscode.diagnostics.has("file:///folder/app.ts")).toBe(false);
+        expect(vscode.diagnostics.has("file:///folder/lib/broken.wgsl")).toBe(false);
+        expect(vscode.diagnostics.get("file:///folder/user.wgsl")).toEqual([]);
     });
 });

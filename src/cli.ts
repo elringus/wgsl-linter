@@ -2,6 +2,7 @@
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { extname, join } from "node:path";
 import { extractTemplates } from "./embed.ts";
+import { lineStarts, position } from "./lines.ts";
 import { Document } from "./service/document.ts";
 import type { Diagnostic } from "./syntax/diagnostic.ts";
 
@@ -45,7 +46,7 @@ function main(args: readonly string[]): number {
         const lines = lineStarts(text);
         const report = (offset: number, kind: string, message: string): void => {
             const [line, column] = position(lines, offset);
-            console.log(`${file}:${line}:${column}: ${kind}: ${message}`);
+            console.log(`${file}:${line + 1}:${column + 1}: ${kind}: ${message}`);
         };
         for (const [diagnostics, shift] of analyze(file, text, tags, prelude))
             for (const d of diagnostics) {
@@ -97,22 +98,4 @@ function* files(paths: readonly string[], templates: boolean): Generator<string>
             else if (ext === ".wgsl" || (templates && scripts.has(ext))) yield child;
         }
     }
-}
-
-function lineStarts(text: string): number[] {
-    const starts = [0];
-    for (let i = 0; i < text.length; i++) if (text.charCodeAt(i) === 10) starts.push(i + 1);
-    return starts;
-}
-
-/** Returns the 1-based line and column of the offset. */
-function position(lines: readonly number[], offset: number): [number, number] {
-    let low = 0;
-    let high = lines.length - 1;
-    while (low < high) {
-        const mid = (low + high + 1) >> 1;
-        if (lines[mid]! <= offset) low = mid;
-        else high = mid - 1;
-    }
-    return [low + 1, offset - lines[low]! + 1];
 }

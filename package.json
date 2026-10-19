@@ -71,6 +71,22 @@
                     "default": [],
                     "scope": "resource",
                     "markdownDescription": "Glob patterns of the `.wgsl` files, relative to the workspace folder, whose declarations are available to all the shaders of the folder, such as the structs and functions shared across a pipeline."
+                },
+                "wgsl.lint": {
+                    "type": "string",
+                    "enum": [
+                        "open",
+                        "files",
+                        "all"
+                    ],
+                    "markdownEnumDescriptions": [
+                        "Only the open documents.",
+                        "Also the `.wgsl` files of the workspace folder.",
+                        "Also the `.wgsl` files and the templates in the JS/TS files of the workspace folder."
+                    ],
+                    "default": "files",
+                    "scope": "resource",
+                    "markdownDescription": "Documents to lint, skipping the files under `node_modules`."
                 }
             }
         },
@@ -116,7 +132,8 @@
         "onLanguage:javascript",
         "onLanguage:javascriptreact",
         "onLanguage:typescript",
-        "onLanguage:typescriptreact"
+        "onLanguage:typescriptreact",
+        "workspaceContains:**/*.wgsl"
     ],
     "icon": "assets/logo.png",
     "engines": {

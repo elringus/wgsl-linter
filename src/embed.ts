@@ -15,6 +15,7 @@ export interface Template {
  * one of the tags, as in wgsl`...`, or preceded by a comment of a tag, as in `/* wgsl *\/ \`...\``.
  */
 export function extractTemplates(source: string, tags: readonly string[]): Template[] {
+    if (!tags.some(tag => source.includes(tag))) return [];
     return new Scanner(source, new Set(tags)).run();
 }
 

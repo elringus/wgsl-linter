@@ -13,6 +13,11 @@ export interface Options extends AnalyzerOptions {
      * engine provides; analyzed as if prepended to each shader.
      */
     readonly prelude?: string;
+    /**
+     * Documents to lint besides the open ones: the workspace's `.wgsl` files (`files`, default),
+     * also its JS/TS templates (`all`) or none (`open`).
+     */
+    readonly lint?: "open" | "files" | "all";
 }
 
 export const wgsl: vscode.DocumentSelector = { language: "wgsl" };
@@ -54,27 +59,34 @@ export class Regions {
         const key = document.uri.toString();
         const cached = this.cache.get(key);
         if (cached?.version === document.version) return cached.regions;
-        const text = document.getText();
-        const { extensions, features } = this.options;
-        const prelude = this.preludeOf(document);
-        let regions: Region[];
-        if (document.languageId === "wgsl") {
-            const doc = new Document(text, { prelude, extensions, features });
-            regions = [{ doc, shift: -doc.base, start: 0, end: text.length }];
-        } else
-            regions = extractTemplates(text, this.tags).map(template => {
-                const { placeholders } = template;
-                const doc = new Document(template.text, {
-                    prelude,
-                    extensions,
-                    features,
-                    placeholders,
-                });
-                const shift = template.start - doc.base;
-                return { doc, shift, start: template.start, end: template.end, template };
-            });
+        const regions = this.analyze(
+            document.uri,
+            document.getText(),
+            document.languageId === "wgsl",
+        );
         this.cache.set(key, { version: document.version, regions });
         return regions;
+    }
+
+    /** Analyzes the WGSL text or the templates of the JS/TS text, without caching. */
+    analyze(uri: vscode.Uri, text: string, wgsl: boolean): Region[] {
+        const { extensions, features } = this.options;
+        const prelude = this.preludeOf(uri);
+        if (wgsl) {
+            const doc = new Document(text, { prelude, extensions, features });
+            return [{ doc, shift: -doc.base, start: 0, end: text.length }];
+        }
+        return extractTemplates(text, this.tags).map(template => {
+            const { placeholders } = template;
+            const doc = new Document(template.text, {
+                prelude,
+                extensions,
+                features,
+                placeholders,
+            });
+            const shift = template.start - doc.base;
+            return { doc, shift, start: template.start, end: template.end, template };
+        });
     }
 
     /** Returns the region at the position and the analyzed offset of the position. */
@@ -85,7 +97,11 @@ export class Regions {
     }
 
     /** Converts the analyzed range to the host document's range, unless it's in the prelude. */
-    range(document: vscode.TextDocument, region: Region, range: Range): vscode.Range | undefined {
+    range(
+        document: Pick<vscode.TextDocument, "positionAt">,
+        region: Region,
+        range: Range,
+    ): vscode.Range | undefined {
         if (range.start < region.doc.base) return undefined;
         return new vscode.Range(
             document.positionAt(range.start + region.shift),
@@ -138,10 +154,10 @@ export class Regions {
     }
 
     /** Returns the prelude of the document, excluding itself. */
-    private preludeOf(document: vscode.TextDocument): string | undefined {
-        const folder = vscode.workspace.getWorkspaceFolder(document.uri);
+    private preludeOf(uri: vscode.Uri): string | undefined {
+        const folder = vscode.workspace.getWorkspaceFolder(uri);
         const files = folder ? this.preludes.get(folder.uri.toString()) : undefined;
-        const key = document.uri.toString();
+        const key = uri.toString();
         const parts = [this.options.prelude ?? ""];
         for (const [uri, text] of files ?? []) if (uri !== key) parts.push(text);
         return parts.join("\n").trim() || undefined;

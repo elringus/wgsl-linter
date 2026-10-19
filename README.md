@@ -37,6 +37,8 @@ Diagnostics depending on the `${}` substitutions are suppressed. Templates are f
 
 To declare the structs and functions shared across the shaders, list the `.wgsl` files with them in the `wgsl.prelude` setting, as globs relative to the workspace folder.
 
+Diagnostics cover all the `.wgsl` files of the workspace, open or not. Set `wgsl.lint` to `all` to also cover the templates in all the JS/TS files or to `open` to cover only the open documents.
+
 ## Command Line
 
 ```bash
@@ -68,6 +70,7 @@ export function activate(context: vscode.ExtensionContext) {
 
 - `tags`: tags of the template literals holding WGSL; `wgsl` by default.
 - `prelude`: WGSL declarations available to all the shaders, such as engine-provided structs.
+- `lint`: the documents to lint, as in the `wgsl.lint` setting; `files` by default.
 - `extensions`, `features`: the enable-extensions and language features the target supports; Chrome's by default.
 
 For highlighting, contribute the `wgsl` language with the configuration and grammars in `syntaxes`, as this repository's `package.json` does.

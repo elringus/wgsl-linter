@@ -26,7 +26,8 @@ export function register(
     options: Options = {},
 ): vscode.Disposable {
     const regions = new Regions(options);
-    const disposable = vscode.Disposable.from(...features(regions, new Diagnostics(regions)));
+    const diagnostics = new Diagnostics(regions, () => options.lint);
+    const disposable = vscode.Disposable.from(...features(regions, diagnostics));
     context.subscriptions.push(disposable);
     return disposable;
 }
@@ -35,15 +36,17 @@ export function register(
 export function features(regions: Regions, diagnostics: Diagnostics): vscode.Disposable[] {
     const { languages, workspace } = vscode;
     const legend = new vscode.SemanticTokensLegend([...tokenTypes], [...tokenModifiers]);
-    diagnostics.lintAll();
+    void diagnostics.lintAll();
     return [
         diagnostics,
+        ...diagnostics.watch(),
         workspace.onDidOpenTextDocument(document => diagnostics.lint(document)),
         workspace.onDidChangeTextDocument(event => diagnostics.lint(event.document)),
         workspace.onDidCloseTextDocument(document => {
             regions.forget(document);
-            diagnostics.delete(document);
+            diagnostics.close(document);
         }),
+        workspace.onDidChangeWorkspaceFolders(() => diagnostics.lintAll()),
         languages.registerDocumentSemanticTokensProvider(
             wgsl,
             { provideDocumentSemanticTokens: d => provideSemanticTokens(regions, d, legend) },
