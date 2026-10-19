@@ -19,7 +19,11 @@ describe("wgsl-lint", () => {
     writeFileSync(join(dir, "bad.wgsl"), "fn f() -> i32 {\n  let x: f32 = 1;\n  return x;\n}\n");
     writeFileSync(
         join(dir, "shader.ts"),
-        "export const s = wgsl`\n${common}\nstruct S { a: Light }\nfn g() -> f32 { return 1u; }\n`;\n",
+        "export const s = wgsl`\nfn g() -> f32 { return 1u; }\n`;\n",
+    );
+    writeFileSync(
+        join(dir, "substituted.ts"),
+        "export const s = wgsl`${common}\nfn g() -> f32 { return 1u; }`;\n",
     );
 
     it("reports the diagnostics with their positions and fails on errors", () => {
@@ -37,14 +41,17 @@ describe("wgsl-lint", () => {
     it("lints the templates of the JS/TS files with the tags", () => {
         const { code, output } = run("--tag", "wgsl", "shader.ts");
         expect(code).toBe(1);
-        expect(output).toContain("shader.ts:4:24: error: return statement type must match");
-        expect(output).not.toContain("Light");
+        expect(output).toContain("shader.ts:2:24: error: return statement type must match");
+    });
+
+    it("skips the templates with substitutions", () => {
+        expect(run("--tag", "wgsl", "substituted.ts")).toEqual({ code: 0, output: "" });
     });
 
     it("searches the directories", () => {
         const { output } = run("--tag", "wgsl", ".");
         expect(output).toContain("bad.wgsl:3:10");
-        expect(output).toContain("shader.ts:4:24");
+        expect(output).toContain("shader.ts:2:24");
     });
 
     it("rejects the unknown options", () => {

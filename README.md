@@ -24,16 +24,15 @@ Language support for WGSL files and templates embedded in JS/TS: a VS Code exten
 - Formatting that keeps the source's line breaks.
 - Semantic highlighting.
 
-All but semantic highlighting also work in JS/TS template literals tagged `wgsl` or preceded by a `/* wgsl */` comment:
+All but semantic highlighting also work in JS/TS template literals (without substitutions) tagged `wgsl` or preceded by a `/* wgsl */` comment:
 
 ```ts
 const shader = wgsl`
-    ${common}
-    @compute @workgroup_size(${size}) fn main() {}
+    @compute @workgroup_size(64) fn main() {}
 `;
 ```
 
-Diagnostics depending on the `${}` substitutions are suppressed. Templates are formatted with the "Format WGSL template" code action.
+Templates are formatted with the "Format WGSL template" code action.
 
 To declare the structs and functions shared across the shaders, list the `.wgsl` files with them in the `wgsl.prelude` setting, as globs relative to the workspace folder.
 

@@ -77,8 +77,7 @@ function analyze(
         return [[doc.diagnostics(), -doc.base]];
     }
     return extractTemplates(text, tags.length > 0 ? tags : ["wgsl"]).map(template => {
-        const { placeholders } = template;
-        const doc = new Document(template.text, { prelude, placeholders });
+        const doc = new Document(template.text, { prelude });
         return [doc.diagnostics(), template.start - doc.base];
     });
 }

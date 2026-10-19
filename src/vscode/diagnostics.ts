@@ -100,8 +100,7 @@ export class Diagnostics implements vscode.Disposable {
         regions: readonly Region[],
     ): void {
         const diagnostics: vscode.Diagnostic[] = [];
-        for (const region of regions) {
-            diagnostics.push(...this.uncheckedMarkers(document, region));
+        for (const region of regions)
             for (const d of region.doc.diagnostics()) {
                 const range = this.regions.range(document, region, d)!;
                 const diagnostic = new vscode.Diagnostic(range, d.message, severity(d.severity));
@@ -119,26 +118,7 @@ export class Diagnostics implements vscode.Disposable {
                 });
                 diagnostics.push(diagnostic);
             }
-        }
         this.collection.set(uri, diagnostics);
-    }
-
-    /** Marks the substitutions that may declare the names left unchecked, to hover for details. */
-    private uncheckedMarkers(
-        document: Pick<vscode.TextDocument, "positionAt">,
-        region: Region,
-    ): vscode.Diagnostic[] {
-        if (region.doc.uncheckedNames().length === 0) return [];
-        return region.doc.declaringPlaceholders().map(([start, end]) => {
-            const range = this.regions.range(document, region, { start, end })!;
-            const marker = new vscode.Diagnostic(
-                range,
-                "some names in this template aren't checked",
-                vscode.DiagnosticSeverity.Hint,
-            );
-            marker.source = "wgsl";
-            return marker;
-        });
     }
 
     /** Whether the closed file is validated: a `.wgsl` file or a JS/TS file of a glob, unless `off`. */

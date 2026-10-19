@@ -22,28 +22,6 @@ describe("document", () => {
         expect(doc.diagnostics()).toEqual([]);
     });
 
-    it("suppresses the diagnostics at the placeholders", () => {
-        const text = "const x: u32 = _p___;";
-        const doc = new Document(text, { placeholders: [15, 20] });
-        expect(doc.diagnostics()).toEqual([]);
-    });
-
-    it("suppresses the unresolved names when a placeholder may declare them", () => {
-        const text = "_p______\nvar<private> l: Light;\nconst x: u32 = -1;";
-        const doc = new Document(text, { placeholders: [0, 8] });
-        expect(doc.diagnostics().map(d => d.message)).toEqual([
-            "value -1 cannot be represented as 'u32'",
-        ]);
-        expect(doc.uncheckedNames()).toEqual(["Light"]);
-        expect(doc.declaringPlaceholders()).toEqual([[0, 8]]);
-    });
-
-    it("leaves no names unchecked when they all resolve", () => {
-        const text = "_p______\nconst x = 1;";
-        const doc = new Document(text, { placeholders: [0, 8] });
-        expect(doc.uncheckedNames()).toEqual([]);
-    });
-
     it("skips the diagnostics of the names declared elsewhere in the partial documents", () => {
         const text =
             "var<private> l: Light;\nfn f() -> f32 { return l.color.x * scale(); }\nconst x: u32 = -1;";
@@ -66,12 +44,5 @@ describe("document", () => {
         expect(count("// license\n\n/* wgsl: off */\n")).toBe(0);
         expect(count("const c = 1;\n// wgsl: off\n")).toBe(2);
         expect(count("// wgsl: unknown\n")).toBe(2);
-    });
-
-    it("keeps the unresolved names when the placeholders are expressions", () => {
-        const text = "var<private> l: Light = _p___;";
-        const doc = new Document(text, { placeholders: [24, 29] });
-        expect(doc.diagnostics().map(d => d.message)).toEqual(["unresolved identifier 'Light'"]);
-        expect(doc.declaringPlaceholders()).toEqual([]);
     });
 });

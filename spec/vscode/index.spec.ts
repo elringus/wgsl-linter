@@ -247,15 +247,10 @@ const shader =
     "struct Light { color: vec3f }\nvar<private> light: Light;\nfn f() -> f32 { return light.color.x; }\n";
 const wgsl = document(shader, "wgsl");
 const script = document(
-    `const n = 4;\nexport const s = wgsl\`\n\${common}\nfn g() -> u32 { let k = 1u; return k; }\n\`;\n`,
+    `const n = 4;\nexport const s = wgsl\`\nconst c = 1;\nfn g() -> u32 { let k = 1u; return k; }\n\`;\n`,
     "typescript",
 );
-const opaque = document(
-    "export const s = wgsl`\n${common}\nvar<private> l: Light;\n`;\n",
-    "typescript",
-    "file:///opaque",
-);
-vscode.workspace.textDocuments.push(wgsl, script, opaque);
+vscode.workspace.textDocuments.push(wgsl, script);
 register({ subscriptions: [] } as never, { prelude: "struct Common { a: f32 }" });
 
 const call = (provider: string, method: string, ...args: unknown[]) =>
@@ -265,11 +260,6 @@ describe("vscode adapter", () => {
     it("publishes the diagnostics of the documents", () => {
         expect(vscode.diagnostics.get("file:///wgsl")).toEqual([]);
         expect(vscode.diagnostics.get("file:///typescript")).toEqual([]);
-    });
-
-    it("marks the substitutions that may declare the unchecked names with a hint", () => {
-        const [marker] = vscode.diagnostics.get("file:///opaque") as { args: unknown[] }[];
-        expect(marker!.args.slice(1)).toEqual(["some names in this template aren't checked", 3]);
     });
 
     it("hovers the names in the wgsl documents and the templates", () => {

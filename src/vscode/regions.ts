@@ -80,14 +80,7 @@ export class Regions {
             return [{ doc, shift: -doc.base, start: 0, end: text.length }];
         }
         return extractTemplates(text, options.tags ?? ["wgsl"]).map(template => {
-            const { placeholders } = template;
-            const doc = new Document(template.text, {
-                prelude,
-                extensions,
-                features,
-                validate,
-                placeholders,
-            });
+            const doc = new Document(template.text, { prelude, extensions, features, validate });
             const shift = template.start - doc.base;
             return { doc, shift, start: template.start, end: template.end, template };
         });

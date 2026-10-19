@@ -38,8 +38,8 @@ describe("format", () => {
     });
 
     it("emits the tokens from the source text when given", () => {
-        expect(format("const x =_p______;", { source: "const x =${a + b};" })).toBe(
-            "const x = ${a + b};\n",
+        expect(format("//  `x `\nconst x=1;", { source: "// \\`x\\`\nconst x=1;" })).toBe(
+            "// \\`x\\`\nconst x = 1;\n",
         );
     });
 });

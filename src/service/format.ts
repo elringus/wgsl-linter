@@ -6,8 +6,7 @@ export interface FormatOptions {
     readonly indent?: string;
     /**
      * The text to emit the tokens and comments from instead of the formatted one; of the same
-     * length, such as the original template content with the substitutions in place of the
-     * placeholders.
+     * length, such as the original template content with the escapes.
      */
     readonly source?: string;
 }

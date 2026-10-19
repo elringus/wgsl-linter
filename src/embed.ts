@@ -4,10 +4,8 @@ export interface Template {
     readonly start: number;
     /** Offset of the closing backtick in the host source, or the source length when missing. */
     readonly end: number;
-    /** The WGSL text: the content with the substitutions and escapes replaced at the same length. */
+    /** The WGSL text: the content with the escapes replaced at the same length. */
     readonly text: string;
-    /** Start and end offsets of the placeholders in the text, in pairs. */
-    readonly placeholders: readonly number[];
 }
 
 /**
@@ -33,7 +31,7 @@ class Scanner {
 
     run(): Template[] {
         this.code(0, false);
-        return this.templates.sort((a, b) => a.start - b.start);
+        return this.templates;
     }
 
     /** Scans the code from the offset; returns the offset of the closing brace of a substitution. */
@@ -111,30 +109,19 @@ class Scanner {
     private template(i: number, tagged: boolean): number {
         const { source } = this;
         const start = i + 1;
-        const placeholders: number[] = [];
+        let substituted = false;
         for (i = start; i < source.length; i++) {
             const c = source[i];
             if (c === "\\") i++;
             else if (c === "`") break;
             else if (c === "$" && source[i + 1] === "{") {
-                const close = this.code(i + 2, true);
-                placeholders.push(i - start, Math.min(close + 1, source.length) - start);
-                i = close;
+                i = this.code(i + 2, true);
+                substituted = true;
             }
         }
         const end = Math.min(i, source.length);
-        if (tagged) {
-            let text = "";
-            let at = start;
-            for (let p = 0; p < placeholders.length; p += 2) {
-                const from = placeholders[p]! + start;
-                const to = placeholders[p + 1]! + start;
-                text += cooked(source.slice(at, from)) + placeholder(to - from);
-                at = to;
-            }
-            text += cooked(source.slice(at, end));
-            this.templates.push({ start, end, text, placeholders });
-        }
+        if (tagged && !substituted)
+            this.templates.push({ start, end, text: cooked(source.slice(start, end)) });
         return end + 1;
     }
 
@@ -178,9 +165,4 @@ function cooked(raw: string): string {
             return value.padStart(escape.length, " ");
         },
     );
-}
-
-/** Returns a WGSL identifier of the length standing for a substitution. */
-function placeholder(length: number): string {
-    return length === 1 ? "p" : `_p${"_".repeat(length - 2)}`;
 }

@@ -3,14 +3,12 @@ import { extractTemplates } from "../src/embed.ts";
 import { lint } from "../src/index.ts";
 
 describe("template extraction", () => {
-    it("extracts the tagged templates with the substitutions as same-length placeholders", () => {
-        const source = "const s = wgsl`const n = ${count};`;";
+    it("skips the templates with substitutions", () => {
+        const source = "const s = wgsl`const n = ${count};`; const t = wgsl`const m = 1;`;";
         const [template, ...rest] = extractTemplates(source, ["wgsl"]);
         expect(rest).toEqual([]);
-        expect(template?.text).toBe("const n = _p______;");
-        expect(template?.text.length).toBe(source.slice(template!.start, template!.end).length);
-        expect(template?.placeholders).toEqual([10, 18]);
-        expect(source.slice(template!.start + 10, template!.start + 18)).toBe("${count}");
+        expect(template?.text).toBe("const m = 1;");
+        expect(source.slice(template!.start, template!.end)).toBe("const m = 1;");
     });
 
     it("replaces the escape sequences by the characters they stand for, keeping the length", () => {
@@ -46,14 +44,12 @@ describe("template extraction", () => {
     });
 
     it("skips the nested templates and braces in the substitutions", () => {
-        const source = "wgsl`a ${f({ x: `}` })} b`";
-        const [template] = extractTemplates(source, ["wgsl"]);
-        expect(template?.text.startsWith("a _p")).toBe(true);
-        expect(template?.text.endsWith(" b")).toBe(true);
+        const source = "wgsl`a ${f({ x: `}` })} b`; wgsl`c`";
+        expect(extractTemplates(source, ["wgsl"]).map(t => t.text)).toEqual(["c"]);
     });
 
     it("finds the templates nested in the substitutions of other templates", () => {
-        const source = "html`<p>${wgsl`fn f() {}`}</p>`";
+        const source = "wgsl`<p>${wgsl`fn f() {}`}</p>`";
         expect(extractTemplates(source, ["wgsl"]).map(t => t.text)).toEqual(["fn f() {}"]);
     });
 
