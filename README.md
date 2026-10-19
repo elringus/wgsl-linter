@@ -24,7 +24,7 @@ Language support for WGSL files and templates embedded in JS/TS: a VS Code exten
 - Formatting that keeps the source's line breaks.
 - Semantic highlighting.
 
-All but semantic highlighting also work in JS/TS template literals tagged `wgsl`:
+All but semantic highlighting also work in JS/TS template literals tagged `wgsl` or preceded by a `/* wgsl */` comment:
 
 ```ts
 const shader = wgsl`
