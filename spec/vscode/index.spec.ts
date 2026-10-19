@@ -54,9 +54,20 @@ const vscode = vi.hoisted(() => {
             return { dispose() {} };
         };
     const event = () => ({ dispose() {} });
+    const settings: Record<string, unknown> = {};
+    const files = new Map<string, string>();
+    const uri = (path: string) => ({ path, toString: () => `file://${path}` });
     return {
         providers,
         diagnostics,
+        settings,
+        files,
+        RelativePattern: class {
+            constructor(
+                readonly base: unknown,
+                readonly pattern: string,
+            ) {}
+        },
         Position,
         Range,
         MarkdownString,
@@ -146,9 +157,31 @@ const vscode = vi.hoisted(() => {
         },
         workspace: {
             textDocuments: [] as unknown[],
+            workspaceFolders: [] as { uri: { toString(): string } }[],
             onDidOpenTextDocument: event,
             onDidChangeTextDocument: event,
             onDidCloseTextDocument: event,
+            onDidChangeWorkspaceFolders: event,
+            onDidChangeConfiguration: event,
+            getConfiguration: () => ({
+                get: (key: string, fallback: unknown) => settings[key] ?? fallback,
+            }),
+            getWorkspaceFolder(target: { toString(): string }) {
+                return this.workspaceFolders.find(f =>
+                    target.toString().startsWith(f.uri.toString()),
+                );
+            },
+            findFiles: async () => [...files.keys()].map(path => uri(path)),
+            fs: {
+                readFile: async (file: { path: string }) =>
+                    new TextEncoder().encode(files.get(file.path)),
+            },
+            createFileSystemWatcher: () => ({
+                onDidCreate: event,
+                onDidDelete: event,
+                onDidChange: event,
+                dispose() {},
+            }),
         },
         window: { activeTextEditor: undefined },
     };
@@ -156,7 +189,7 @@ const vscode = vi.hoisted(() => {
 
 vi.mock("vscode", () => vscode);
 
-const { register, formatTemplates } = await import("../../src/vscode/index.ts");
+const { activate, register, formatTemplates } = await import("../../src/vscode/index.ts");
 
 /** A text document of the VS Code API over the text. */
 function document(text: string, languageId: string, uri = `file:///${languageId}`) {
@@ -329,5 +362,26 @@ describe("vscode adapter", () => {
         }[];
         expect(format()).toEqual([action!.edit.edits[0]![1]]);
         expect(format(["shader"])).toHaveLength(1);
+    });
+
+    it("declares the prelude files of the folder settings to the folder's shaders", async () => {
+        vscode.workspace.workspaceFolders.push({ uri: { toString: () => "file:///folder/" } });
+        vscode.settings.prelude = ["shaders/*"];
+        vscode.files.set("/folder/shaders/common.wgsl", "struct Params { color: vec3f }");
+        vscode.files.set("/folder/shaders/notes.txt", "not a shader");
+        const user = "var<private> p: Params;\n";
+        vscode.workspace.textDocuments.push(
+            document(user, "wgsl", "file:///folder/user.wgsl"),
+            document(
+                "struct Params { color: vec3f }\n",
+                "wgsl",
+                "file:///folder/shaders/common.wgsl",
+            ),
+            document(user, "wgsl", "file:///other/user.wgsl"),
+        );
+        await activate({ subscriptions: [] } as never);
+        expect(vscode.diagnostics.get("file:///folder/user.wgsl")).toEqual([]);
+        expect(vscode.diagnostics.get("file:///folder/shaders/common.wgsl")).toEqual([]);
+        expect(vscode.diagnostics.get("file:///other/user.wgsl")).toHaveLength(1);
     });
 });

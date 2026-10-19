@@ -35,6 +35,8 @@ const shader = wgsl`
 
 Diagnostics depending on the `${}` substitutions are suppressed. Templates are formatted with the "Format WGSL template" code action.
 
+To declare the structs and functions shared across the shaders, list the `.wgsl` files with them in the `wgsl.prelude` setting, as globs relative to the workspace folder.
+
 ## Command Line
 
 ```bash

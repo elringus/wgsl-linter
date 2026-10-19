@@ -60,6 +60,20 @@
         "webgpu": "0.6.2"
     },
     "contributes": {
+        "configuration": {
+            "title": "WGSL",
+            "properties": {
+                "wgsl.prelude": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "default": [],
+                    "scope": "resource",
+                    "markdownDescription": "Glob patterns of the `.wgsl` files, relative to the workspace folder, whose declarations are available to all the shaders of the folder, such as the structs and functions shared across a pipeline."
+                }
+            }
+        },
         "languages": [
             {
                 "id": "wgsl",

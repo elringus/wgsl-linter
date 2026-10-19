@@ -44,6 +44,7 @@ const scripts: vscode.DocumentSelector = [
     { language: "typescriptreact" },
 ];
 const all: vscode.DocumentSelector = [wgsl, ...(scripts as vscode.DocumentFilter[])];
+const decoder = new TextDecoder();
 
 /**
  * A WGSL source within a VS Code document: a whole `.wgsl` document or a template literal;
@@ -72,7 +73,13 @@ export function register(
     return disposable;
 }
 
-export { register as activate };
+/** Activates the extension with the workspace settings. */
+export async function activate(context: vscode.ExtensionContext): Promise<void> {
+    const features = new Features({});
+    await features.loadPreludes();
+    const disposables = [...features.register(), ...features.watchPreludes()];
+    context.subscriptions.push(vscode.Disposable.from(...disposables));
+}
 
 /** Formats the WGSL templates with the tags in the editor's document. */
 export function formatTemplates(
@@ -97,6 +104,8 @@ class Features {
     private readonly tags: readonly string[];
     private readonly cache = new Map<string, { version: number; regions: Region[] }>();
     private readonly diagnostics = vscode.languages.createDiagnosticCollection("wgsl");
+    /** Prelude file texts by file URI, by workspace folder URI. */
+    private readonly preludes = new Map<string, Map<string, string>>();
 
     constructor(private readonly options: Options) {
         this.tags = options.tags ?? ["wgsl"];
@@ -167,6 +176,58 @@ class Features {
         ];
     }
 
+    // ---- preludes ----
+
+    /** Loads the files of the `wgsl.prelude` setting. */
+    async loadPreludes(): Promise<void> {
+        const { workspace } = vscode;
+        this.preludes.clear();
+        for (const folder of workspace.workspaceFolders ?? []) {
+            const files = new Map<string, string>();
+            const globs = workspace.getConfiguration("wgsl", folder).get<string[]>("prelude", []);
+            for (const glob of globs)
+                for (const uri of await workspace.findFiles(
+                    new vscode.RelativePattern(folder, glob),
+                ))
+                    if (uri.path.endsWith(".wgsl"))
+                        files.set(uri.toString(), decoder.decode(await workspace.fs.readFile(uri)));
+            this.preludes.set(folder.uri.toString(), files);
+        }
+    }
+
+    /** Reloads the preludes on changes. */
+    watchPreludes(): vscode.Disposable[] {
+        const { workspace } = vscode;
+        const reload = async (): Promise<void> => {
+            await this.loadPreludes();
+            this.cache.clear();
+            for (const document of workspace.textDocuments) this.lint(document);
+        };
+        const isPrelude = (uri: vscode.Uri): boolean =>
+            [...this.preludes.values()].some(files => files.has(uri.toString()));
+        const watcher = workspace.createFileSystemWatcher("**/*.wgsl");
+        return [
+            watcher,
+            watcher.onDidCreate(reload),
+            watcher.onDidDelete(reload),
+            watcher.onDidChange(uri => isPrelude(uri) && reload()),
+            workspace.onDidChangeWorkspaceFolders(reload),
+            workspace.onDidChangeConfiguration(
+                event => event.affectsConfiguration("wgsl.prelude") && reload(),
+            ),
+        ];
+    }
+
+    /** Returns the prelude of the document, excluding itself. */
+    private preludeOf(document: vscode.TextDocument): string | undefined {
+        const folder = vscode.workspace.getWorkspaceFolder(document.uri);
+        const files = folder ? this.preludes.get(folder.uri.toString()) : undefined;
+        const key = document.uri.toString();
+        const parts = [this.options.prelude ?? ""];
+        for (const [uri, text] of files ?? []) if (uri !== key) parts.push(text);
+        return parts.join("\n").trim() || undefined;
+    }
+
     // ---- regions ----
 
     private regions(document: vscode.TextDocument): Region[] {
@@ -174,7 +235,8 @@ class Features {
         const cached = this.cache.get(key);
         if (cached?.version === document.version) return cached.regions;
         const text = document.getText();
-        const { prelude, extensions, features } = this.options;
+        const { extensions, features } = this.options;
+        const prelude = this.preludeOf(document);
         let regions: Region[];
         if (document.languageId === "wgsl") {
             const doc = new Document(text, { prelude, extensions, features });
